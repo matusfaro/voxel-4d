@@ -42,8 +42,12 @@ Fly.prototype.bindKeyEvents = function(el) {
         spaceUpAfterFirstDown = false
         return first = Date.now()
       } else {
-        if (!self.flying && spaceUpAfterFirstDown) {
-          self.startFlying()
+        if (spaceUpAfterFirstDown) {
+          if (self.flying) {
+            self.stopFlying()
+          } else {
+            self.startFlying()
+          }
         }
       }
       spaceUpAfterFirstDown = false
