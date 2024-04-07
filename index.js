@@ -3,8 +3,8 @@ var highlight = require('voxel-highlight')
 var player = require('voxel-player')
 var voxel = require('voxel')
 var extend = require('extend')
-var fly = require('voxel-fly')
-var walk = require('voxel-walk')
+var fly = require('./deps/voxel-fly')
+var walk = require('./deps/voxel-walk')
 
 module.exports = function(opts, setup) {
   setup = setup || defaultSetup
