@@ -9,10 +9,11 @@ var walk = require('./deps/voxel-walk')
 module.exports = function(opts, setup) {
   setup = setup || defaultSetup
   var defaults = {
-    generate: voxel.generator['Valley'],
+    generate: voxel.generator['Hill'],
     chunkDistance: 2,
-    materials: ['#fff', '#000'],
-    materialFlatColor: true,
+    texturePath: './textures/',
+    materials: ['grass', 'obsidian', 'dirt', 'whitewool', 'crate', 'brick'],
+    materialFlatColor: false,
     worldOrigin: [0, 0, 0],
     controls: { discreteFire: true }
   }
@@ -54,11 +55,11 @@ function defaultSetup(game, avatar) {
 
   // toggle between first and third person modes
   window.addEventListener('keydown', function (ev) {
-    if (ev.keyCode === 'R'.charCodeAt(0)) avatar.toggle()
+    if (ev.keyCode === 'V'.charCodeAt(0)) avatar.toggle()
   })
 
   // block interaction stuff, uses highlight data
-  var currentMaterial = 1
+  var currentMaterial = 3
 
   game.on('fire', function (target, state) {
     var position = blockPosPlace
