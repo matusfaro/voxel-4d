@@ -1,15 +1,19 @@
 var createGame = require('voxel-engine')
 var highlight = require('voxel-highlight')
 var player = require('voxel-player')
-var voxel = require('voxel')
 var extend = require('extend')
 var fly = require('./deps/voxel-fly')
 var walk = require('./deps/voxel-walk')
+var terrain = require('./deps/voxel-perlin-terrain')
+
+var chunkSize = 32
+// initialize your noise with a seed, floor height, ceiling height and scale factor
+var generateChunk = terrain('foo', 0, 15, 20)
 
 module.exports = function(opts, setup) {
   setup = setup || defaultSetup
   var defaults = {
-    generate: voxel.generator['Hill'],
+    generateChunks: false,
     chunkDistance: 2,
     texturePath: './textures/',
     materials: ['grass', 'obsidian', 'dirt', 'whitewool', 'crate', 'brick'],
@@ -80,4 +84,13 @@ function defaultSetup(game, avatar) {
     else walk.startWalking()
   })
 
+  game.voxels.on('missingChunk', function (p) {
+    var voxels = generateChunk(p, chunkSize)
+    var chunk = {
+      position: p,
+      dims: [chunkSize, chunkSize, chunkSize],
+      voxels: voxels
+    }
+    game.showChunk(chunk)
+  })
 }
