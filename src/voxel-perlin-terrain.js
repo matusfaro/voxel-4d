@@ -21,10 +21,13 @@ module.exports = function (seed) {
             const xTransformed = pTransform[0]
             const zTransformed = pTransform[1]
             const wTransformed = pTransform[2]
+            if (x >= 0 && x <= 1 && z >= 0 && z <= 1) {
+                console.log('x', x, 'z', z, 'x`', xTransformed, 'z`', zTransformed, 'w`', wTransformed)
+            }
             if (startY === width) {
                 // Generate clouds
-                let n = noise.simplex2(xTransformed / divisorClouds, zTransformed / divisorClouds)
-                if (n < -0.75) {
+                let n = noise.perlin3(xTransformed / divisorClouds, zTransformed / divisorClouds, wTransformed / divisorMountains)
+                if (n < -0.45) {
                     setBlock(chunk, x, startY, z, width, 4)
                 }
             } else if (startY === 0) {
