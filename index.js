@@ -65,7 +65,6 @@ function defaultSetup(game, avatar) {
     // toggle between first and third person modes
     window.addEventListener('keydown', function (ev) {
         if (ev.keyCode === 'V'.charCodeAt(0)) avatar.toggle()
-        if (ev.keyCode === 'E'.charCodeAt(0)) terrain.onPressChange(game)
     })
 
     game.on('fire', function (target, state) {
@@ -86,7 +85,5 @@ function defaultSetup(game, avatar) {
         else walk.startWalking()
     })
 
-    game.voxels.on('missingChunk', function (p) {
-        terrain.onMissingChunk(game, p)
-    })
+    terrain.use(game)
 }

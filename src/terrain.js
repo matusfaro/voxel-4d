@@ -9,14 +9,48 @@ var offsets = {
     z: 0,
     w: 0
 }
+// Added or deleted blocks, indexed by chunk position then block index
+var blocks = {}
 
 // initialize your noise with a seed, floor height, ceiling height and scale factor
 var generateChunk = terrain('foo')
 
+exports.use = function (game) {
+
+    // Chunk loading
+    game.voxels.on('missingChunk', function (p) {
+        onMissingChunk(game, p)
+    })
+
+    // Keep track of added/deleted blocks
+    game.on('setBlock', function (pos, val, old) {
+        setBlockModified(pTransformer(pos[0], pos[2]), pos[1], val)
+    })
+
+    // Toggle Axis change
+    window.addEventListener('keydown', function (ev) {
+        if (ev.keyCode === 'E'.charCodeAt(0)) onPressChange(game)
+    })
+}
+
+function setBlockModified(pTransformed, y, val) {
+    const key = pTransformed.join('|')
+    var blocksY = blocks[key]
+    if (blocksY === undefined) {
+        blocksY = {}
+        blocks[key] = blocksY
+    }
+    blocksY[y] = val
+}
+
+function getBlockModified(pTransformed) {
+    return blocks[pTransformed.join('|')]
+}
+
 function onMissingChunk(game, p) {
 
     // Generate chunk
-    var voxels = generateChunk(p, chunkSize, getPTransformer())
+    var voxels = generateChunk(game, p, chunkSize, pTransformer, getBlockModified)
     var chunk = {
         position: p,
         dims: [chunkSize, chunkSize, chunkSize],
@@ -25,9 +59,7 @@ function onMissingChunk(game, p) {
     game.showChunk(chunk)
 }
 
-exports.onMissingChunk = onMissingChunk
-
-exports.onPressChange = function (game) {
+function onPressChange(game) {
     const playerPosition = game.playerPosition()
 
     // Figure out which axis to swap
@@ -41,13 +73,11 @@ exports.onPressChange = function (game) {
     const swapAxisPlayerPosition = Math.floor(playerPosition[swapAxis === 'x' ? 0 : 2])
     offsets[swapVirtualAxisFrom] += swapAxisPlayerPosition
     offsets[swapVirtualAxisTo] -= swapAxisPlayerPosition
-    console.log('offsets', offsets)
 
     // Swap axis
     let tempAxis = otherPlaneAxis;
     otherPlaneAxis = currentPlaneAxis[swapAxis === 'x' ? 0 : 1];
     currentPlaneAxis[swapAxis === 'x' ? 0 : 1] = tempAxis;
-    console.log('currentPlaneAxis', currentPlaneAxis)
 
     // Reload all chunks
     Object.values(game.voxels.chunks).forEach(function (chunk) {
@@ -57,12 +87,12 @@ exports.onPressChange = function (game) {
     })
 
     // Set block underneath the player
-    let blockUnderneathPlayerPosition = [playerPosition[0], playerPosition[1] - 1, playerPosition[2]];
-    while (blockUnderneathPlayerPosition[1] > -10 && game.getBlock(blockUnderneathPlayerPosition) === 0) {
-        // Keep looking for a block
-        blockUnderneathPlayerPosition[1] -= 1;
-    }
-    game.setBlock(blockUnderneathPlayerPosition, 2)
+    // let blockUnderneathPlayerPosition = [playerPosition[0], playerPosition[1] - 1, playerPosition[2]];
+    // while (blockUnderneathPlayerPosition[1] > -10 && game.getBlock(blockUnderneathPlayerPosition) === 0) {
+    //     // Keep looking for a block
+    //     blockUnderneathPlayerPosition[1] -= 1;
+    // }
+    // game.setBlock(blockUnderneathPlayerPosition, 2)
 
     // Show blue planes
     showPlane(game, facingAxis, 'left', playerPosition)
@@ -125,35 +155,19 @@ function getCardinalDirection(yaw) {
         : 'z'
 }
 
-function getPTransformer() {
-    return function (x, z) {
-        const xzwTransformed = [
-            offsets.x,
-            offsets.z,
-            offsets.w,
-        ];
-        xzwTransformed[currentPlaneAxisToIndex(currentPlaneAxis[0])] += x
-        xzwTransformed[currentPlaneAxisToIndex(currentPlaneAxis[1])] += z
-        return xzwTransformed
-    }
+const currentPlaneAxisToIndex = {
+    x: 0,
+    z: 1,
+    w: 2
 }
 
-function currentPlaneAxisToIndex(axis) {
-    if (axis === 'x') {
-        return 0
-    } else if (axis === 'z') {
-        return 1
-    } else if (axis === 'w') {
-        return 2
-    }
-}
-
-function axisToIndex(axis) {
-    if (axis === 'x') {
-        return 0
-    } else if (axis === 'y') {
-        return 1
-    } else if (axis === 'z') {
-        return 2
-    }
+function pTransformer(x, z) {
+    const xzwTransformed = [
+        offsets.x,
+        offsets.z,
+        offsets.w,
+    ];
+    xzwTransformed[currentPlaneAxisToIndex[currentPlaneAxis[0]]] += x
+    xzwTransformed[currentPlaneAxisToIndex[currentPlaneAxis[1]]] += z
+    return xzwTransformed
 }

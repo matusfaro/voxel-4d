@@ -11,7 +11,8 @@ module.exports = function (seed) {
     let divisorMountains = 50
     let changeTexture = (ceiling - floor) / 3
     noise.seed(seed)
-    return function generateChunk(position, width, pTransformer) {
+    return function generateChunk(game, position, width, pTransformer, getBlockModified) {
+        game.voxels.voxelAtPosition(position)
         var startX = position[0] * width
         var startY = position[1] * width
         var startZ = position[2] * width
@@ -21,9 +22,6 @@ module.exports = function (seed) {
             const xTransformed = pTransform[0]
             const zTransformed = pTransform[1]
             const wTransformed = pTransform[2]
-            if (x >= 0 && x <= 1 && z >= 0 && z <= 1) {
-                console.log('x', x, 'z', z, 'x`', xTransformed, 'z`', zTransformed, 'w`', wTransformed)
-            }
             if (startY === width) {
                 // Generate clouds
                 let n = noise.perlin3(xTransformed / divisorClouds, zTransformed / divisorClouds, wTransformed / divisorMountains)
@@ -36,6 +34,13 @@ module.exports = function (seed) {
                 var y = ~~scale(n, -0.5, 0.5, floor + 1, ceiling)
                 setMountain(chunk, x, y, z, width, startY, changeTexture)
             }
+            // Apply any user modifications
+            const blockOverrides = getBlockModified(pTransform)
+            Object.entries(blockOverrides || {}).forEach(function (row) {
+                const y = row[0]
+                const val = row[1]
+                setBlock(chunk, x, y, z, width, val)
+            })
         })
         return chunk
     }
