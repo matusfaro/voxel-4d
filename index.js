@@ -5,6 +5,8 @@ var extend = require('extend')
 var fly = require('./src/voxel-fly')
 var walk = require('./src/voxel-walk')
 const terrain = require("./src/terrain");
+const level = require("./src/level");
+const gps = require("./src/gps");
 
 module.exports = function (opts, setup) {
     setup = setup || defaultSetup
@@ -19,7 +21,7 @@ module.exports = function (opts, setup) {
     }
     opts = extend({}, defaults, opts || {})
 
-    // setup the game and add some trees
+    // setup the game
     var game = createGame(opts)
     var container = opts.container || document.body
     window.game = game // for debugging
@@ -43,7 +45,7 @@ function defaultSetup(game, avatar) {
 
     var makeFly = fly(game)
     var target = game.controls.target()
-    target.moveTo(0.5, 10, 0.5)
+    target.moveTo(0.5, 32, 0.5)
     game.flyer = makeFly(target)
 
     // highlight blocks when you look at them, hold <Ctrl> for block placement
@@ -85,5 +87,7 @@ function defaultSetup(game, avatar) {
         else walk.startWalking()
     })
 
+    level.setScene(game, terrain.setBlockModified)
     terrain.use(game)
+    gps.use(game, terrain)
 }

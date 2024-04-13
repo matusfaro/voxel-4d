@@ -6,10 +6,10 @@ var noise = require('perlin').noise
 
 module.exports = function (seed) {
     let floor = 0
-    let ceiling = 20
+    let ceiling = 32
     let divisorClouds = 30
     let divisorMountains = 50
-    let changeTexture = (ceiling - floor) / 3
+    let determineTexture = getDetermineTexture(ceiling, floor)
     noise.seed(seed)
     return function generateChunk(game, position, width, pTransformer, getBlockModified) {
         game.voxels.voxelAtPosition(position)
@@ -32,17 +32,35 @@ module.exports = function (seed) {
                 // Generate mountains
                 let n = noise.simplex3(xTransformed / divisorMountains, zTransformed / divisorMountains, wTransformed / divisorMountains)
                 var y = ~~scale(n, -0.5, 0.5, floor + 1, ceiling)
-                setMountain(chunk, x, y, z, width, startY, changeTexture)
+                setMountain(chunk, x, y, z, wTransformed, width, startY, determineTexture)
             }
+
             // Apply any user modifications
             const blockOverrides = getBlockModified(pTransform)
             Object.entries(blockOverrides || {}).forEach(function (row) {
                 const y = row[0]
+                if (y < startY || y >= startY + width) return
                 const val = row[1]
                 setBlock(chunk, x, y, z, width, val)
             })
         })
         return chunk
+    }
+}
+
+function getDetermineTexture(ceiling, floor) {
+    let dirtThreshold = (ceiling - floor) / 3
+    const upper = 25;
+    return function (x, y, z, w) {
+        if (w !== 0) {
+            const n = noise.simplex3(x, y, z, w)
+            var n2 = ~~scale(n, -0.5, 0.5, 0, upper)
+            if (n2 < Math.abs(w)) return 2
+            if (n2 < (Math.abs(w) + 10)) return 3
+        }
+        return y === 0
+            ? 2
+            : (y > dirtThreshold ? 1 : 3)
     }
 }
 
@@ -56,12 +74,9 @@ function scale(x, fromLow, fromHigh, toLow, toHigh) {
     return (x - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow
 }
 
-function setMountain(chunk, x, maxY, z, width, startY, changeTexture) {
+function setMountain(chunk, x, maxY, z, wTransformed, width, startY, determineTexture) {
     for (let y = startY; y < maxY; y++) {
-        setBlock(chunk, x, y, z, width,
-            y === startY
-                ? 2
-                : (y > changeTexture ? 1 : 3))
+        setBlock(chunk, x, y, z, width, determineTexture(x, y, z, wTransformed))
     }
 }
 

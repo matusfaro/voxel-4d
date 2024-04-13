@@ -2,17 +2,39 @@ var terrain = require('./voxel-perlin-terrain')
 
 var chunkSize = 32
 
+/**
+ * Keeps track of which axes are visible.
+ * <p>
+ * e.g. value of [x, w] means that x axis is still the x axis while the y-axis is now the w-axis.
+ *
+ * @type {string[]}
+ */
 var currentPlaneAxis = ['x', 'z'];
+/**
+ * Non-visible axis.
+ * <p>
+ * This is the missing axis from currentPlaneAxis. It is not currently shown and is always constant unless swapped again.
+ * @type {string}
+ */
 var otherPlaneAxis = 'w';
+/**
+ * Offsets to apply to x,z,w axes.
+ * <p>
+ * This is used to for properly aligning the world during axes swap. (Instead of moving the player)
+ * @type {{w: number, x: number, z: number}}
+ */
 var offsets = {
     x: 0,
     z: 0,
     w: 0
 }
-// Added or deleted blocks, indexed by chunk position then block index
+/**
+ * Added or deleted blocks, indexed by chunk position then block index
+ * @type {{[xzwKey]: {[y]: number}}} Given position of x-z-w axis, returns an object where given y-axis, gives the material number
+ */
 var blocks = {}
 
-// initialize your noise with a seed, floor height, ceiling height and scale factor
+// Init terrain generator
 var generateChunk = terrain('foo')
 
 exports.use = function (game) {
@@ -24,7 +46,7 @@ exports.use = function (game) {
 
     // Keep track of added/deleted blocks
     game.on('setBlock', function (pos, val, old) {
-        setBlockModified(pTransformer(pos[0], pos[2]), pos[1], val)
+        setBlockModified(pos, val)
     })
 
     // Toggle Axis change
@@ -33,7 +55,10 @@ exports.use = function (game) {
     })
 }
 
-function setBlockModified(pTransformed, y, val) {
+function setBlockModified(pos, val) {
+    const pTransformed = pTransformer(pos[0], pos[2])
+    const y = pos[1]
+
     const key = pTransformed.join('|')
     var blocksY = blocks[key]
     if (blocksY === undefined) {
@@ -42,6 +67,8 @@ function setBlockModified(pTransformed, y, val) {
     }
     blocksY[y] = val
 }
+
+exports.setBlockModified = setBlockModified
 
 function getBlockModified(pTransformed) {
     return blocks[pTransformed.join('|')]
@@ -66,6 +93,10 @@ function onPressChange(game) {
     const yaw = game.controls.target().yaw.rotation.y
     const facingAxis = getCardinalDirection(yaw)
     const swapAxis = facingAxis === 'x' ? 'z' : 'x'
+
+    // Show blue planes
+    showPlane(game, facingAxis, 'left', playerPosition)
+    showPlane(game, facingAxis, 'right', playerPosition)
 
     // Swap axis values first
     const swapVirtualAxisFrom = currentPlaneAxis[swapAxis === 'x' ? 0 : 1]
@@ -93,10 +124,6 @@ function onPressChange(game) {
     //     blockUnderneathPlayerPosition[1] -= 1;
     // }
     // game.setBlock(blockUnderneathPlayerPosition, 2)
-
-    // Show blue planes
-    showPlane(game, facingAxis, 'left', playerPosition)
-    showPlane(game, facingAxis, 'right', playerPosition)
 }
 
 function showPlane(game, facingAxis, moveDirection, playerPosition) {
@@ -171,3 +198,5 @@ function pTransformer(x, z) {
     xzwTransformed[currentPlaneAxisToIndex[currentPlaneAxis[1]]] += z
     return xzwTransformed
 }
+
+exports.pTransformer = pTransformer
