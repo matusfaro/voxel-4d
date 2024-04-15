@@ -12,37 +12,51 @@ module.exports = function (seed) {
     let determineTexture = getDetermineTexture(ceiling, floor)
     noise.seed(seed)
     return function generateChunk(game, position, width, pTransformer, getBlockModified) {
-        game.voxels.voxelAtPosition(position)
         var startX = position[0] * width
         var startY = position[1] * width
         var startZ = position[2] * width
         var chunk = new Int8Array(width * width * width)
-        pointsInside(startX, startZ, width, function (x, z) {
-            const pTransform = pTransformer(x, z)
+        var perlinGenMountainCachePos
+        var perlinGenMountainCacheVal
+        pointsInside(startX, startY, startZ, width, function (x, y, z) {
+            const pTransform = pTransformer(x, y, z)
             const xTransformed = pTransform[0]
-            const zTransformed = pTransform[1]
-            const wTransformed = pTransform[2]
-            if (startY === width) {
-                // Generate clouds
-                let n = noise.perlin3(xTransformed / divisorClouds, zTransformed / divisorClouds, wTransformed / divisorMountains)
-                if (n < -0.45) {
-                    setBlock(chunk, x, startY, z, width, 4)
-                }
-            } else if (startY === 0) {
-                // Generate mountains
-                let n = noise.simplex3(xTransformed / divisorMountains, zTransformed / divisorMountains, wTransformed / divisorMountains)
-                var y = ~~scale(n, -0.5, 0.5, floor + 1, ceiling)
-                setMountain(chunk, x, y, z, wTransformed, width, startY, determineTexture)
-            }
+            const yTransformed = pTransform[1]
+            const zTransformed = pTransform[2]
+            const wTransformed = pTransform[3]
 
             // Apply any user modifications
-            const blockOverrides = getBlockModified(pTransform)
-            Object.entries(blockOverrides || {}).forEach(function (row) {
-                const y = row[0]
-                if (y < startY || y >= startY + width) return
-                const val = row[1]
-                setBlock(chunk, x, y, z, width, val)
-            })
+            const blockOverride = getBlockModified(pTransform)
+            if (blockOverride !== undefined) {
+                setBlock(chunk, x, y, z, width, blockOverride)
+                return
+            }
+
+            // Generate clouds
+            if (startY >= width) {
+                const perlinGen = noise.perlin3(xTransformed / divisorClouds, yTransformed * (divisorClouds), zTransformed / divisorClouds)
+                if (perlinGen < -0.70) {
+                    setBlock(chunk, x, y, z, width, 4)
+                }
+            }
+
+            // Generate mountains
+            {
+                // Cache value. If Y is constant, we don't need to re-generate this value for every Y in the chunk
+                let perlinGenMountain
+                let perlinGenMountainCacheKey = [xTransformed, zTransformed, wTransformed].join('|')
+                if (perlinGenMountainCachePos === perlinGenMountainCacheKey) {
+                    perlinGenMountain = perlinGenMountainCacheVal
+                } else {
+                    perlinGenMountain = noise.simplex3(xTransformed / divisorMountains, zTransformed / divisorMountains, wTransformed / divisorMountains)
+                    perlinGenMountainCacheVal = perlinGenMountain
+                    perlinGenMountainCachePos = perlinGenMountainCacheKey
+                }
+                const mountainPeak = ~~scale(perlinGenMountain, -0.5, 0.5, floor + 1, ceiling)
+                if (mountainPeak >= yTransformed) {
+                    setBlock(chunk, x, y, z, width, determineTexture(xTransformed, yTransformed, zTransformed, wTransformed))
+                }
+            }
         })
         return chunk
     }
@@ -64,20 +78,15 @@ function getDetermineTexture(ceiling, floor) {
     }
 }
 
-function pointsInside(startX, startY, width, func) {
-    for (var x = startX; x < startX + width; x++)
-        for (var y = startY; y < startY + width; y++)
-            func(x, y)
+function pointsInside(startX, startY, startZ, width, func) {
+    for (let x = startX; x < startX + width; x++)
+        for (let z = startZ; z < startZ + width; z++)
+            for (let y = startY; y < startY + width; y++)
+                func(x, y, z)
 }
 
 function scale(x, fromLow, fromHigh, toLow, toHigh) {
     return (x - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow
-}
-
-function setMountain(chunk, x, maxY, z, wTransformed, width, startY, determineTexture) {
-    for (let y = startY; y < maxY; y++) {
-        setBlock(chunk, x, y, z, width, determineTexture(x, y, z, wTransformed))
-    }
 }
 
 function setBlock(chunk, x, y, z, width, value) {

@@ -4,7 +4,6 @@
  */
 var ever = require('ever')
 var vkey = require('vkey')
-var events = require('events')
 
 var game
 

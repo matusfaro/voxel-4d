@@ -1,15 +1,16 @@
 var terrain = require('./voxel-perlin-terrain')
 
-var chunkSize = 32
+const chunkSize = 16
+exports.chunkSize = chunkSize
 
 /**
  * Keeps track of which axes are visible.
  * <p>
- * e.g. value of [x, w] means that x axis is still the x axis while the y-axis is now the w-axis.
+ * e.g. value of [x, y, w] means that z-axis is now the w-axis.
  *
  * @type {string[]}
  */
-var currentPlaneAxis = ['x', 'z'];
+var currentPlaneAxis = ['x', 'y', 'z'];
 /**
  * Non-visible axis.
  * <p>
@@ -25,6 +26,7 @@ var otherPlaneAxis = 'w';
  */
 var offsets = {
     x: 0,
+    y: 0,
     z: 0,
     w: 0
 }
@@ -51,21 +53,16 @@ exports.use = function (game) {
 
     // Toggle Axis change
     window.addEventListener('keydown', function (ev) {
-        if (ev.keyCode === 'E'.charCodeAt(0)) onPressChange(game)
+        if (ev.keyCode === 'E'.charCodeAt(0)) onPressChangeAxis(game)
+        if (ev.keyCode === 'R'.charCodeAt(0)) onPressConstantIncrement(game, +1)
+        if (ev.keyCode === 'F'.charCodeAt(0)) onPressConstantIncrement(game, -1)
     })
 }
 
 function setBlockModified(pos, val) {
-    const pTransformed = pTransformer(pos[0], pos[2])
-    const y = pos[1]
-
+    const pTransformed = pTransformer(pos[0], pos[1], pos[2])
     const key = pTransformed.join('|')
-    var blocksY = blocks[key]
-    if (blocksY === undefined) {
-        blocksY = {}
-        blocks[key] = blocksY
-    }
-    blocksY[y] = val
+    blocks[key] = val
 }
 
 exports.setBlockModified = setBlockModified
@@ -73,6 +70,8 @@ exports.setBlockModified = setBlockModified
 function getBlockModified(pTransformed) {
     return blocks[pTransformed.join('|')]
 }
+
+exports.getBlockModified = getBlockModified
 
 function onMissingChunk(game, p) {
 
@@ -86,36 +85,32 @@ function onMissingChunk(game, p) {
     game.showChunk(chunk)
 }
 
-function onPressChange(game) {
+function onPressChangeAxis(game) {
     const playerPosition = game.playerPosition()
 
     // Figure out which axis to swap
     const yaw = game.controls.target().yaw.rotation.y
-    const facingAxis = getCardinalDirection(yaw)
-    const swapAxis = facingAxis === 'x' ? 'z' : 'x'
+    const pitch = game.controls.target().pitch.rotation.x
+    const facingAxis = getLookDirection(yaw, pitch)
+    const swapAxis = facingAxis === 'y' ? 'y' : (facingAxis === 'x' ? 'z' : 'x')
 
     // Show blue planes
     showPlane(game, facingAxis, 'left', playerPosition)
     showPlane(game, facingAxis, 'right', playerPosition)
 
     // Swap axis values first
-    const swapVirtualAxisFrom = currentPlaneAxis[swapAxis === 'x' ? 0 : 1]
+    const swapVirtualAxisFrom = currentPlaneAxis[xyzwAxisToIndex[swapAxis]]
     const swapVirtualAxisTo = otherPlaneAxis
-    const swapAxisPlayerPosition = Math.floor(playerPosition[swapAxis === 'x' ? 0 : 2])
+    const swapAxisPlayerPosition = Math.floor(playerPosition[xyzwAxisToIndex[swapAxis]])
     offsets[swapVirtualAxisFrom] += swapAxisPlayerPosition
     offsets[swapVirtualAxisTo] -= swapAxisPlayerPosition
 
     // Swap axis
     let tempAxis = otherPlaneAxis;
-    otherPlaneAxis = currentPlaneAxis[swapAxis === 'x' ? 0 : 1];
-    currentPlaneAxis[swapAxis === 'x' ? 0 : 1] = tempAxis;
+    otherPlaneAxis = currentPlaneAxis[xyzwAxisToIndex[swapAxis]];
+    currentPlaneAxis[xyzwAxisToIndex[swapAxis]] = tempAxis;
 
-    // Reload all chunks
-    Object.values(game.voxels.chunks).forEach(function (chunk) {
-        // TODO try out emit to see if performance improves
-        // game.voxels.emit('missingChunk', chunk.position)
-        onMissingChunk(game, chunk.position)
-    })
+    reloadAllChunks(game)
 
     // Set block underneath the player
     // let blockUnderneathPlayerPosition = [playerPosition[0], playerPosition[1] - 1, playerPosition[2]];
@@ -124,6 +119,21 @@ function onPressChange(game) {
     //     blockUnderneathPlayerPosition[1] -= 1;
     // }
     // game.setBlock(blockUnderneathPlayerPosition, 2)
+}
+
+function onPressConstantIncrement(game, increment) {
+
+    offsets[otherPlaneAxis] += increment
+
+    reloadAllChunks(game)
+}
+
+function reloadAllChunks(game) {
+    Object.values(game.voxels.chunks).forEach(function (chunk) {
+        // TODO try out emit to see if performance improves
+        // game.voxels.emit('missingChunk', chunk.position)
+        onMissingChunk(game, chunk.position)
+    })
 }
 
 function showPlane(game, facingAxis, moveDirection, playerPosition) {
@@ -173,7 +183,14 @@ function showPlane(game, facingAxis, moveDirection, playerPosition) {
     game.on('tick', onTick)
 }
 
-function getCardinalDirection(yaw) {
+function getLookDirection(yaw, pitch) {
+    // Figure out if you're looking at the sun at a 45 degree or more angle
+    const isLookingUp = Math.abs(Math.sin(pitch)) > 0.707
+    if (isLookingUp) {
+        // Up
+        return 'y'
+    }
+    // Figure out yaw for cardinal direction
     const normalizedYaw = (yaw + (2 * Math.PI)) % (2 * Math.PI);
     return Math.abs(Math.sin(normalizedYaw)) > Math.abs(Math.cos(normalizedYaw))
         // East/West
@@ -182,21 +199,24 @@ function getCardinalDirection(yaw) {
         : 'z'
 }
 
-const currentPlaneAxisToIndex = {
+const xyzwAxisToIndex = {
     x: 0,
-    z: 1,
-    w: 2
+    y: 1,
+    z: 2,
+    w: 3
 }
 
-function pTransformer(x, z) {
-    const xzwTransformed = [
+function pTransformer(x, y, z) {
+    const xyzwTransformed = [
         offsets.x,
+        offsets.y,
         offsets.z,
         offsets.w,
     ];
-    xzwTransformed[currentPlaneAxisToIndex[currentPlaneAxis[0]]] += x
-    xzwTransformed[currentPlaneAxisToIndex[currentPlaneAxis[1]]] += z
-    return xzwTransformed
+    xyzwTransformed[xyzwAxisToIndex[currentPlaneAxis[0]]] += x
+    xyzwTransformed[xyzwAxisToIndex[currentPlaneAxis[1]]] += y
+    xyzwTransformed[xyzwAxisToIndex[currentPlaneAxis[2]]] += z
+    return xyzwTransformed
 }
 
 exports.pTransformer = pTransformer
