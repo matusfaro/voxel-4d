@@ -12,12 +12,16 @@ module.exports = function (opts, setup) {
     setup = setup || defaultSetup
     var defaults = {
         generateChunks: false,
-        chunkDistance: 2,
         texturePath: './textures/',
         materials: ['grass', 'obsidian', 'dirt', 'whitewool', 'crate', 'brick'],
         materialFlatColor: false,
         worldOrigin: [0, 0, 0],
-        controls: {discreteFire: true}
+        controls: {discreteFire: true},
+        chunkDistance: 2,
+        removeDistance: 3,
+        chunkSize: terrain.chunkSize,
+        fogDisabled: false,
+        fogScale: 16,
     }
     opts = extend({}, defaults, opts || {})
 
