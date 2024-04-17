@@ -13,11 +13,11 @@ exports.use = function (game, terrain) {
     const wEl = document.getElementById('position-w')
     game.on('tick', function () {
         const playerPosition = game.playerPosition()
-        yEl.innerHTML = playerPosition[1].toFixed(1)
-        const pTransformed = terrain.pTransformer(playerPosition[0], playerPosition[2])
+        const pTransformed = terrain.pTransformer(playerPosition[0], playerPosition[1], playerPosition[2])
         xEl.innerHTML = pTransformed[0].toFixed(1)
-        zEl.innerHTML = pTransformed[1].toFixed(1)
-        wEl.innerHTML = pTransformed[2].toFixed(1)
+        yEl.innerHTML = pTransformed[1].toFixed(1)
+        zEl.innerHTML = pTransformed[2].toFixed(1)
+        wEl.innerHTML = pTransformed[3].toFixed(1)
     })
 
     // Show visual axis on screen
