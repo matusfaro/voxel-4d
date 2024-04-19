@@ -12,12 +12,6 @@
             overflow: hidden;
         }
 
-        #container {
-            -moz-user-select: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-
         #crosshair {
             position: fixed;
             top: 50%;
@@ -25,6 +19,7 @@
             margin: -16px 0 0 -16px;
             width: 32px;
             height: 32px;
+            z-index: 1;
         }
 
         #stats {
@@ -41,6 +36,7 @@
             position: absolute;
             top: 5px;
             left: 5px;
+            z-index: 1;
         }
 
         .position {
@@ -50,6 +46,7 @@
             color: white;
             display: flex;
             flex-direction: column;
+            z-index: 1;
         }
 
         .position > div {
@@ -61,7 +58,6 @@
 </head>
 <body>
 <img class="logo" src="voxel-engine.png">
-<div id="container"></div>
 <div id="crosshair"><img src="crosshair.png"/></div>
 <div class="position">
     <div id="position-visual"></div>
