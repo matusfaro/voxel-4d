@@ -1,7 +1,6 @@
 var createEngine = require('voxel-engine-stackgl')
 var extend = require('extend')
 const level = require("./src/level");
-const gps = require("./src/gps");
 
 const start = function () {
     createEngine({
@@ -32,7 +31,8 @@ const start = function () {
             'voxel-food': require('voxel-food'),
             'voxel-scriptblock': require('voxel-scriptblock'),
             'voxel-sfx': require('voxel-sfx'),
-            'voxel-flight': require('voxel-flight'),
+            'voxel-flight': require('./src/voxel-flight'),
+            'voxel-gps': require('./src/voxel-gps'),
             'voxel-gamemode': require('voxel-gamemode'),
             'voxel-sprint': require('voxel-sprint'),
             'voxel-decals': require('voxel-decals'),
@@ -71,8 +71,8 @@ const start = function () {
                 useAtlas: true,
                 generateChunks: false,
                 chunkSize: 16,
-                chunkDistance: 2,
-                removeDistance: 3,
+                chunkDistance: 3,
+                removeDistance: 4,
                 worldOrigin: [0, 0, 0],
                 controls: {
                     discreteFire: false,
@@ -122,10 +122,7 @@ const start = function () {
                 artpacks: ['ProgrammerArt-ResourcePack.zip']
             },
             'voxel-shader': {
-                //cameraFOV: 45,
-                //cameraFOV: 70,
                 cameraFOV: 90
-                //cameraFOV: 110,
             },
 
             'voxel-mesher': {},
@@ -180,7 +177,8 @@ const start = function () {
             'voxel-food': {},
             'voxel-scriptblock': {},
             'voxel-sfx': {},
-            'voxel-flight': {},
+            'voxel-flight': {flySpeed: 1},
+            'voxel-gps': {},
             'voxel-gamemode': {startMode: 'creative'},
             'voxel-sprint': {},
             'voxel-inventory-hotbar': {inventorySize: 10, wheelEnable: true},
@@ -211,58 +209,56 @@ const start = function () {
 }
 start()
 
-const startOld = function (opts, setup) {
-    setup = setup || defaultSetup
-    var defaults = {
-        generateChunks: false,
-        texturePath: './textures/',
-        materials: ['grass', 'obsidian', 'dirt', 'whitewool', 'crate', 'brick'],
-        materialFlatColor: false,
-        worldOrigin: [0, 0, 0],
-        controls: {discreteFire: true},
-        chunkDistance: 2,
-        removeDistance: 3,
-        chunkSize: terrain.chunkSize,
-        fogDisabled: false,
-        fogScale: 16,
-    }
-    opts = extend({}, defaults, opts || {})
-
-    // setup the game
-    var game = createGame(opts)
-    var container = opts.container || document.body
-    window.game = game // for debugging
-    game.appendTo(container)
-    if (game.notCapable()) return game
-
-    var createPlayer = player(game)
-
-    // create the player from a minecraft skin file and tell the
-    // game to use it as the main player
-    var avatar = createPlayer(opts.playerSkin || 'player.png')
-    avatar.possess()
-    avatar.yaw.position.set(2, 14, 4)
-
-    setup(game, avatar)
-
-    return game
-}
-
-function defaultSetup(game, avatar) {
-
-    // TODO convert to plugin
-    game.on('fire', function (target, state) {
-        var position = blockPosPlace
-        if (position) {
-            game.createBlock(position, 6)
-        } else {
-            position = blockPosErase
-            if (position) game.setBlock(position, 0)
-        }
-    })
-
-    // TODO convert to plugin
-    level.setScene(game, terrain.setBlockModified)
-    // TODO convert to plugin
-    gps.use(game, terrain)
-}
+// const startOld = function (opts, setup) {
+//     setup = setup || defaultSetup
+//     var defaults = {
+//         generateChunks: false,
+//         texturePath: './textures/',
+//         materials: ['grass', 'obsidian', 'dirt', 'whitewool', 'crate', 'brick'],
+//         materialFlatColor: false,
+//         worldOrigin: [0, 0, 0],
+//         controls: {discreteFire: true},
+//         chunkDistance: 2,
+//         removeDistance: 3,
+//         chunkSize: terrain.chunkSize,
+//         fogDisabled: false,
+//         fogScale: 16,
+//     }
+//     opts = extend({}, defaults, opts || {})
+//
+//     // setup the game
+//     var game = createGame(opts)
+//     var container = opts.container || document.body
+//     window.game = game // for debugging
+//     game.appendTo(container)
+//     if (game.notCapable()) return game
+//
+//     var createPlayer = player(game)
+//
+//     // create the player from a minecraft skin file and tell the
+//     // game to use it as the main player
+//     var avatar = createPlayer(opts.playerSkin || 'player.png')
+//     avatar.possess()
+//     avatar.yaw.position.set(2, 14, 4)
+//
+//     setup(game, avatar)
+//
+//     return game
+// }
+//
+// function defaultSetup(game, avatar) {
+//
+//     // TODO convert to plugin
+//     game.on('fire', function (target, state) {
+//         var position = blockPosPlace
+//         if (position) {
+//             game.createBlock(position, 6)
+//         } else {
+//             position = blockPosErase
+//             if (position) game.setBlock(position, 0)
+//         }
+//     })
+//
+//     // TODO convert to plugin
+//     level.setScene(game, terrain.setBlockModified)
+// }

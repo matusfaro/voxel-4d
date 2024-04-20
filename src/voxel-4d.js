@@ -1,7 +1,9 @@
 'use strict';
 
+const webworkify = require('webworkify');
+const unworkify = require('unworkify');
 const ndarray = require('ndarray');
-const terrain = require("./voxel-perlin-terrain");
+const Voxel4dLocation = require('./voxel-4d-location');
 
 module.exports = function (game, opts) {
     return new Voxel4D(game, opts);
@@ -28,38 +30,7 @@ function Voxel4D(game, opts) {
 Voxel4D.prototype.enable = function () {
     const self = this
 
-    /**
-     * Keeps track of which axes are visible.
-     * <p>
-     * e.g. value of [x, y, w] means that z-axis is now the w-axis.
-     *
-     * @type {string[]}
-     */
-    this.currentPlaneAxis = ['x', 'y', 'z'];
-    /**
-     * Non-visible axis.
-     * <p>
-     * This is the missing axis from currentPlaneAxis. It is not currently shown and is always constant unless swapped again.
-     * @type {string}
-     */
-    this.otherPlaneAxis = 'w';
-    /**
-     * Offsets to apply to x,y,z,w axes.
-     * <p>
-     * This is used to for properly aligning the world during axes swap. (Instead of moving the player)
-     * @type {{x: number, y: number, z: number, w: number}}
-     */
-    this.offsets = {
-        x: 0,
-        y: 0,
-        z: 0,
-        w: 0
-    }
-    /**
-     * Added or deleted blocks, indexed by chunk position then block index
-     * @type {{[xzwKey]: {[y]: number}}} Given position of x-z-w axis, returns an object where given y-axis, gives the material number
-     */
-    this.blocks = {}
+    this.location = new Voxel4dLocation()
 
     // Register blocks
     const blockGrass = this.registry.registerBlock('grass', {
@@ -75,12 +46,37 @@ Voxel4D.prototype.enable = function () {
         requiredTool: 'pickaxe'
     });
 
-    this.generateChunk = terrain(
-        this.game,
-        'foo',
-        blockGrass,
-        blockObsidian,
-        blockDirt)
+    if (process.browser) {
+        this.worker = webworkify(require('./voxel-4d-worker.js'));
+    } else {
+        // fallback to unthreaded
+        this.worker = unworkify(require('./voxel-4d-worker.js'));
+    }
+    this.worker.addEventListener('message', this.onWorkerMessage = this.workerMessage.bind(this));
+
+
+    // can't clone types, so need to send size instead
+    var arrayElementSize
+    if (this.game.arrayType === Uint8Array || this.game.arrayType === Uint8ClampedArray)
+        arrayElementSize = 1;
+    else if (this.game.arrayType === Uint16Array)
+        arrayElementSize = 2;
+    else if (this.game.arrayType === Uint32Array)
+        arrayElementSize = 4;
+    else
+        throw new Error('unknown game.arrayType: ' + this.game.arrayType)
+
+    this.worker.postMessage({
+        cmd: 'configure', opts: {
+            width: this.game.chunkSize,
+            pad: this.game.chunkPad,
+            arrayElementSize: arrayElementSize,
+            seed: 'foo',
+            blockGrass: blockGrass,
+            blockObsidian: blockObsidian,
+            blockDirt: blockDirt,
+        }
+    });
 
     // Chunk loading
     this.game.voxels.on('missingChunk', this.onMissingChunk = this.missingChunk.bind(this));
@@ -89,17 +85,18 @@ Voxel4D.prototype.enable = function () {
     this.game.on('setBlock', this.onSetBlock = this.setBlock.bind(this));
 
     // Key bindings
-    this.keys.down.on('dimension axis switch', this.onDimensionAxisSwitch = this.onPressChangeAxis.bind(this));
+    this.keys.down.on('dimension axis switch', this.onDimensionAxisSwitch = this.dimensionAxisSwitch.bind(this));
     this.keys.down.on('dimension increment', this.onDimensionIncrement = function () {
-        self.onPressConstantIncrement(+1)
+        self.dimensionIncrement(+1)
     });
     this.keys.down.on('dimension decrement', this.onDimensionDecrement = function () {
-        self.onPressConstantIncrement(-1)
+        self.dimensionIncrement(-1)
     });
 };
 
 Voxel4D.prototype.disable = function () {
     this.game.removeListener('setBlock', this.onSetBlock);
+    this.worker.removeListener('message', this.onWorkerMessage);
     this.game.voxels.removeListener('missingChunk', this.onMissingChunk);
     this.keys.down.removeListener('dimension axis switch', this.onDimensionAxisSwitch);
     this.keys.down.removeListener('dimension increment', this.onDimensionIncrement);
@@ -108,87 +105,96 @@ Voxel4D.prototype.disable = function () {
 
 // API
 
-Voxel4D.prototype.setBlock = function (pos, val, old) {
-    const pTransformed = this.pTransformer(pos[0], pos[1], pos[2])
-    const key = pTransformed.join('|')
-    this.blocks[key] = val
+Voxel4D.prototype.workerMessage = function (event) {
+    if (event.data.cmd === 'chunkGenerated') {
+        this.chunkGenerated(event.data.position, event.data.voxelBuffer)
+    } else {
+        console.error('Unknown message from worker', event.data)
+    }
 };
 
-Voxel4D.prototype.getBlockModified = function (pTransformed) {
-    return this.blocks[pTransformed.join('|')]
+Voxel4D.prototype.setBlock = function (position, value, old) {
+    this.worker.postMessage({cmd: 'setBlock', position: position, value: value})
 };
 
 Voxel4D.prototype.missingChunk = function (position) {
-    var width = this.game.chunkSize;
-    var pad = this.game.chunkPad;
-    var arrayType = this.game.arrayType;
-    const voxelsPadded = ndarray(
-        new arrayType(new ArrayBuffer((width + pad) * (width + pad) * (width + pad) * arrayType.BYTES_PER_ELEMENT)),
-        [width + pad, width + pad, width + pad])
-    var h = pad >> 1;
-    var voxels = voxelsPadded.lo(h, h, h).hi(width, width, width);
-
-    this.generateChunk(voxels, position, width, this.pTransformer.bind(this), this.getBlockModified.bind(this))
-
-    const chunk = voxelsPadded
-    chunk.position = position
-    this.game.showChunk(chunk)
+    this.worker.postMessage({cmd: 'generateChunk', position: position})
 }
 
-Voxel4D.prototype.onPressChangeAxis = function () {
-    const playerPosition = this.game.playerPosition()
+Voxel4D.prototype.chunkGenerated = function (position, voxelBuffer) {
+    const voxels = new this.game.arrayType(voxelBuffer);
+    const chunk = ndarray(voxels, [this.game.chunkSize + this.game.chunkPad, this.game.chunkSize + this.game.chunkPad, this.game.chunkSize + this.game.chunkPad]);
+    chunk.position = position;
+
+    this.game.showChunk(chunk);
+}
+
+Voxel4D.prototype.dimensionAxisSwitch = function () {
 
     // Figure out which axis to swap
+    const playerPosition = this.game.playerPosition()
     const yaw = this.game.controls.target().yaw.rotation.y
     const pitch = this.game.controls.target().pitch.rotation.x
     const facingAxis = this.getLookDirection(yaw, pitch)
-    const swapAxis = facingAxis === 'y' ? 'y' : (facingAxis === 'x' ? 'z' : 'x')
+
+    // Record locally
+    this.location.dimensionAxisSwitch(facingAxis, playerPosition)
+    // Record in worker
+    this.worker.postMessage({cmd: 'dimensionAxisSwitch', facingAxis: facingAxis, playerPosition: playerPosition})
+
+    this.reloadAllChunks(game)
 
     // Show blue planes
     // TODO convert from THREEJS to webgl
-    // showPlane(this.game, facingAxis, 'left', playerPosition)
-    // showPlane(this.game, facingAxis, 'right', playerPosition)
-
-    // Swap axis values first
-    const swapVirtualAxisFrom = this.currentPlaneAxis[xyzwAxisToIndex[swapAxis]]
-    const swapVirtualAxisTo = this.otherPlaneAxis
-    const swapAxisPlayerPosition = Math.floor(playerPosition[xyzwAxisToIndex[swapAxis]])
-    this.offsets[swapVirtualAxisFrom] += swapAxisPlayerPosition
-    this.offsets[swapVirtualAxisTo] -= swapAxisPlayerPosition
-
-    // Swap axis
-    let tempAxis = this.otherPlaneAxis;
-    this.otherPlaneAxis = this.currentPlaneAxis[xyzwAxisToIndex[swapAxis]];
-    this.currentPlaneAxis[xyzwAxisToIndex[swapAxis]] = tempAxis;
-
-    this.reloadAllChunks()
-
-    // Set block underneath the player
-    // let blockUnderneathPlayerPosition = [playerPosition[0], playerPosition[1] - 1, playerPosition[2]];
-    // while (blockUnderneathPlayerPosition[1] > -10 && game.getBlock(blockUnderneathPlayerPosition) === 0) {
-    //     // Keep looking for a block
-    //     blockUnderneathPlayerPosition[1] -= 1;
-    // }
-    // game.setBlock(blockUnderneathPlayerPosition, 2)
+    // this.showPlane(this.game, facingAxis, 'left', playerPosition)
+    // this.showPlane(this.game, facingAxis, 'right', playerPosition)
 }
 
-Voxel4D.prototype.onPressConstantIncrement = function (increment) {
+Voxel4D.prototype.dimensionIncrement = function (increment) {
 
-    this.offsets[this.otherPlaneAxis] += increment
+    // Record locally
+    this.location.dimensionIncrement(increment)
+    // Record in worker
+    this.worker.postMessage({cmd: 'dimensionIncrement', increment: increment})
 
     this.reloadAllChunks(game)
 }
 
 Voxel4D.prototype.reloadAllChunks = function () {
     var self = this
-    Object.values(this.game.voxels.chunks).forEach(function (chunk) {
-        // TODO try out emit to see if performance improves
-        // game.voxels.emit('missingChunk', chunk.position)
-        self.missingChunk(chunk.position)
-    })
+
+    // Stop processing any chunks that are queued
+    this.worker.postMessage({cmd: 'discardQueuedChunkGeneration'})
+
+    // Reload all existing chunks
+    const playerChunkPosition = this.game.playerPosition()
+        .map(function (pos) {
+            return pos / self.game.chunkSize
+        })
+    Object.values(this.game.voxels.chunks)
+        .sort(function (a, b) {
+            // Load nearby chunks first
+            return Math.sqrt(
+                Math.pow(a.position[0] - playerChunkPosition[0], 2) +
+                Math.pow(a.position[1] - playerChunkPosition[1], 2) +
+                Math.pow(a.position[2] - playerChunkPosition[2], 2)
+            ) - Math.sqrt(
+                Math.pow(b.position[0] - playerChunkPosition[0], 2) +
+                Math.pow(b.position[1] - playerChunkPosition[1], 2) +
+                Math.pow(b.position[2] - playerChunkPosition[2], 2)
+            )
+        })
+        .forEach(function (chunk) {
+            self.missingChunk(chunk.position)
+        })
+
+    // If you spam reloading chunks, sometimes far away chunks never get loaded
+    // Request missing chunks around player just in case
+    this.game.voxels.requestMissingChunks(this.game.playerPosition())
 }
 
 Voxel4D.prototype.showPlane = function (facingAxis, moveDirection, playerPosition) {
+    // TODO convert from THREEJS to webgl
     var self = this
     const THREE = this.game.THREE
     const scene = this.game.scene
@@ -250,24 +256,4 @@ Voxel4D.prototype.getLookDirection = function (yaw, pitch) {
         ? 'x'
         // North/South
         : 'z'
-}
-
-const xyzwAxisToIndex = {
-    x: 0,
-    y: 1,
-    z: 2,
-    w: 3
-}
-
-Voxel4D.prototype.pTransformer = function (x, y, z) {
-    const xyzwTransformed = [
-        this.offsets.x,
-        this.offsets.y,
-        this.offsets.z,
-        this.offsets.w,
-    ];
-    xyzwTransformed[xyzwAxisToIndex[this.currentPlaneAxis[0]]] += x
-    xyzwTransformed[xyzwAxisToIndex[this.currentPlaneAxis[1]]] += y
-    xyzwTransformed[xyzwAxisToIndex[this.currentPlaneAxis[2]]] += z
-    return xyzwTransformed
 }
