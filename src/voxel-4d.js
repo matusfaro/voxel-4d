@@ -145,9 +145,7 @@ Voxel4D.prototype.dimensionAxisSwitch = function () {
     this.reloadAllChunks(game)
 
     // Show blue planes
-    // TODO convert from THREEJS to webgl
-    // this.showPlane(this.game, facingAxis, 'left', playerPosition)
-    // this.showPlane(this.game, facingAxis, 'right', playerPosition)
+    // TODO show planes
 }
 
 Voxel4D.prototype.dimensionIncrement = function (increment) {
@@ -191,55 +189,6 @@ Voxel4D.prototype.reloadAllChunks = function () {
     // If you spam reloading chunks, sometimes far away chunks never get loaded
     // Request missing chunks around player just in case
     this.game.voxels.requestMissingChunks(this.game.playerPosition())
-}
-
-Voxel4D.prototype.showPlane = function (facingAxis, moveDirection, playerPosition) {
-    // TODO convert from THREEJS to webgl
-    var self = this
-    const THREE = this.game.THREE
-    const scene = this.game.scene
-
-    const geometry = new THREE.PlaneGeometry(100, 100);
-    const material = new THREE.MeshBasicMaterial({
-        color: 0x80ddff,
-        transparent: true,
-        side: THREE.DoubleSide,
-        opacity: 1,
-    });
-    const plane = new THREE.Mesh(geometry, material);
-
-    // Set position
-    const alignFun = moveDirection === 'left' ? Math.floor : Math.ceil
-    const position = [alignFun(playerPosition[0]), playerPosition[1], alignFun(playerPosition[2])]
-    const planeAabb = this.game.playerAABB(position);
-    plane.position.set(planeAabb.x0() + planeAabb.width() / 2, planeAabb.y0() + planeAabb.height() / 2, planeAabb.z0() + planeAabb.depth() / 2)
-    // Set orientation
-    if (facingAxis === 'z') {
-        plane.rotation.y = Math.PI / 2;
-    }
-    // Render
-    scene.add(plane);
-
-    // Make it move and fade out over time
-    var moveAmount = (moveDirection === 'left' ? -1 : 1) * 0.01
-    const onTick = function () {
-
-        // Move
-        plane.position.set(
-            plane.position.x + (facingAxis === 'z' ? moveAmount : 0),
-            plane.position.y,
-            plane.position.z + (facingAxis === 'x' ? moveAmount : 0))
-        // Speed up movement
-        moveAmount += moveAmount
-
-        // Fade out
-        material.opacity -= 0.05
-        if (material.opacity < 0.01) {
-            self.game.removeListener('tick', onTick)
-            scene.remove(plane);
-        }
-    }
-    this.game.on('tick', onTick)
 }
 
 Voxel4D.prototype.getLookDirection = function (yaw, pitch) {
