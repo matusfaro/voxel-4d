@@ -74,3 +74,22 @@ Voxel4DLocation.prototype.pTransformer = function (x, y, z) {
     return xyzwTransformed
 }
 
+
+Voxel4DLocation.prototype.pUntransformer = function (x, y, z, w) {
+    const xyzwTransformed = [
+        x - this.offsets.x,
+        y - this.offsets.y,
+        z - this.offsets.z,
+        w - this.offsets.w,
+    ];
+    if (xyzwTransformed[this.xyzwAxisToIndex[this.otherPlaneAxis]] !== 0) {
+        // this position is in another dimension
+        return null
+    }
+    return [
+        xyzwTransformed[this.xyzwAxisToIndex[this.currentPlaneAxis[0]]],
+        xyzwTransformed[this.xyzwAxisToIndex[this.currentPlaneAxis[1]]],
+        xyzwTransformed[this.xyzwAxisToIndex[this.currentPlaneAxis[2]]]
+    ]
+}
+
