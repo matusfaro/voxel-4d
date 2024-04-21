@@ -63,6 +63,7 @@ VoxelMultiplayerEntities.prototype.removeAllEntities = function () {
 }
 
 VoxelMultiplayerEntities.prototype.init = function () {
+    this.glInited = true;
     this.shader = glShader(this.game.shell.gl,
         glslify("/* voxel-decals vertex shader */\
 attribute vec3 position;\
@@ -168,7 +169,7 @@ VoxelMultiplayerEntities.prototype.update = function () {
 var scratch0 = mat4.create();
 
 VoxelMultiplayerEntities.prototype.render = function (deltaTime) {
-    if (!this.mesh) {
+    if (!this.mesh || !this.glInited) {
         return
     }
 

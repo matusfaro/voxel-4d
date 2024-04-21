@@ -1,6 +1,5 @@
 var createEngine = require('voxel-engine-stackgl')
 var extend = require('extend')
-const level = require("./src/level");
 
 const start = function () {
     createEngine({
@@ -31,8 +30,8 @@ const start = function () {
             'voxel-food': require('voxel-food'),
             'voxel-scriptblock': require('voxel-scriptblock'),
             'voxel-sfx': require('voxel-sfx'),
-            'voxel-flight': require('./src/voxel-flight'),
-            'voxel-gps': require('./src/voxel-gps'),
+            'voxel-flight': require('./voxel-flight'),
+            'voxel-gps': require('./voxel-gps'),
             'voxel-gamemode': require('voxel-gamemode'),
             'voxel-sprint': require('voxel-sprint'),
             'voxel-decals': require('voxel-decals'),
@@ -48,12 +47,12 @@ const start = function () {
             'voxel-glass': require('voxel-glass'),
             // 'voxel-land': require('voxel-land'),
             // 'voxel-flatland': require('voxel-flatland'),
-            'voxel-4d': require('./src/voxel-4d'),
+            'voxel-4d': require('./voxel-4d'),
             'voxel-decorative': require('voxel-decorative'),
             'voxel-inventory-creative': require('voxel-inventory-creative'),
             // 'voxel-clientmc': require('voxel-clientmc');  // TODO: after published
-            'voxel-multiplayer': require('./src/voxel-multiplayer'),
-            'voxel-multiplayer-entities': require('./src/voxel-multiplayer-entities'),
+            'voxel-multiplayer': require('./voxel-multiplayer'),
+            'voxel-multiplayer-entities': require('./voxel-multiplayer-entities'),
             'voxel-console': require('voxel-console'),
             'voxel-commands': require('voxel-commands'),
             'voxel-drop': require('voxel-drop'),
@@ -121,7 +120,7 @@ const start = function () {
             // built-in plugins
             'voxel-registry': {},
             'voxel-stitch': {
-                artpacks: ['ProgrammerArt-ResourcePack.zip']
+                artpacks: ['assets/ProgrammerArt-ResourcePack.zip']
             },
             'voxel-shader': {
                 cameraFOV: 90

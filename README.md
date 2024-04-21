@@ -1,38 +1,53 @@
-# voxel-hello-world
+# voxel-4d
 
-Learn more at http://voxeljs.com
+Four dimensions in three dimensional space. A Minecraft-like Voxel game where you can swap out any dimension for
+another.
 
-# Using it as a module
+## Build
 
-`npm install voxel-hello-world`
+Download dependencies:
 
-```javascript
-var game = require('voxel-hello-world')
+```shell
+pnpm install`
 ```
 
-# Get it running on your machine
+Then build the project:
 
-The first time you set up, you should install the required npm packages:
-
+```shell
+pnpm run build
 ```
-cd voxel-hello-world
-npm install
+
+Then serve content out of `dist` folder:
+
+```shell
+pnpm run serve
+```
+
+Then point your browser to [http://localhost:3000](http://localhost:3000) and have fun!
+
+## Development
+
+Download dependencies:
+
+```shell
+pnpm install
 ```
 
 Then run the start script:
 
+```shell
+pnpm run start
 ```
-npm start
-```
 
-Then point your browser to [http://localhost:8080](http://localhost:8080) and have fun!
+Then point your browser to [http://localhost:7080](http://localhost:7080) and have fun!
 
-## How does this work?
+## History
 
-voxel.js modules use [browserify](http://browserify.org) for packaging modules together into game bundles. This means that every time you change code in your game you have to build a new bundle in order to test it out. Luckily this is very easy and is automated. When you run the `npm start` script, it runs a local server: when the browser requests `index.js`, it compiles it serverside and then serves up the compiled version.
+A long time ago (~2013), I used [VoxelJS](https://web.archive.org/web/20190108105609/http://voxeljs.com/) and
+its [voxel-engine](https://github.com/max-mapper/voxel-engine) to
+create a 4-dimensional game. I've since lost the code, but the idea persisted.
 
-The upshot is, as long as you're running the `npm start` script in the background, you can save your changes to index.js and reload the game to see the new code in action, without having to have a build step in between. (If you'd like to change the start script, it's contained in the `package.json` file in the root directory.)
-
-## license
-
-BSD
+When I've picked it up in 2024, I found the original engine has been abandoned. I've revived the engine and re-built the
+4d game from scratch. I then found that the original author ported the engine from ThreeJS to WebGL and added a lot of
+extra functionality as part of [Voxel Metaverse](https://github.com/voxel/voxelmetaverse). I've decided to port the
+plugins into the new WebGL engine and continued development from there.
