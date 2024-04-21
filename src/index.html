@@ -32,18 +32,24 @@
             left: 33% !important;
         }
 
-        .logo {
+        .menu-topleft {
             position: absolute;
             top: 5px;
             left: 5px;
             z-index: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .position-container {
+            color: white;
+            display: flex;
+            align-items: start;
+            z-index: 1;
         }
 
         .position {
-            position: absolute;
-            left: 5px;
-            bottom: 5px;
-            color: white;
             display: flex;
             flex-direction: column;
             z-index: 1;
@@ -57,15 +63,19 @@
     </style>
 </head>
 <body>
-<img class="logo" src="assets/voxel-engine.png">
-<div id="crosshair"><img src="assets/crosshair.png"/></div>
-<div class="position">
-    <div id="position-visual"></div>
-    <div>X: <span id="position-x"></span></div>
-    <div>Y: <span id="position-y"></span></div>
-    <div>Z: <span id="position-z"></span></div>
-    <div>W: <span id="position-w"></span></div>
+<div class="menu-topleft">
+    <img src="assets/voxel-engine.png">
+    <div class="position-container">
+        <div class="position">
+            <div id="position-visual"></div>
+            <div>X: <span id="position-x"></span></div>
+            <div>Y: <span id="position-y"></span></div>
+            <div>Z: <span id="position-z"></span></div>
+            <div>W: <span id="position-w"></span></div>
+        </div>
+    </div>
 </div>
+<div id="crosshair"><img src="assets/crosshair.png"/></div>
 <script type="text/javascript" src="index.js"></script>
 </body>
 </html>

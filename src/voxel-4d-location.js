@@ -82,7 +82,7 @@ Voxel4DLocation.prototype.pUntransformer = function (x, y, z, w) {
         z - this.offsets.z,
         w - this.offsets.w,
     ];
-    if (xyzwTransformed[this.xyzwAxisToIndex[this.otherPlaneAxis]] !== 0) {
+    if (Math.floor(xyzwTransformed[this.xyzwAxisToIndex[this.otherPlaneAxis]]) !== 0) {
         // this position is in another dimension
         return null
     }
@@ -93,3 +93,31 @@ Voxel4DLocation.prototype.pUntransformer = function (x, y, z, w) {
     ]
 }
 
+
+Voxel4DLocation.prototype.pUntransformerWithShift = function (x, y, z, w) {
+    const xyzwTransformed = [
+        x - this.offsets.x,
+        y - this.offsets.y,
+        z - this.offsets.z,
+        w - this.offsets.w,
+    ];
+    const otherAxisPosition = xyzwTransformed[this.xyzwAxisToIndex[this.otherPlaneAxis]]
+
+    if (otherAxisPosition === 0) {
+        // We are in the same dimension, all good
+    } else if (Math.floor(otherAxisPosition) === 0) {
+        // We are in another dimension, but still within a block away
+        // technically we shouldn't be able to see this person, but we can still show them for a brief time
+        // let's just shift them across the x axis (chosen arbitrarily)
+        xyzwTransformed[this.xyzwAxisToIndex[this.currentPlaneAxis[0]]] += otherAxisPosition
+    } else {
+        // We are completely in another dimension
+        // Hide us
+        return null
+    }
+    return [
+        xyzwTransformed[this.xyzwAxisToIndex[this.currentPlaneAxis[0]]],
+        xyzwTransformed[this.xyzwAxisToIndex[this.currentPlaneAxis[1]]],
+        xyzwTransformed[this.xyzwAxisToIndex[this.currentPlaneAxis[2]]]
+    ]
+}

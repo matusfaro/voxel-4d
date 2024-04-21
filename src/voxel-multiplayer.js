@@ -1,4 +1,4 @@
-const peerjsmesh = require("@manishiitg/peerjs-mesh")
+const peerjsmesh = require("./lib/peerjs-mesh/mesh")
 const VoxelMultiplayerEntity = require('./voxel-multiplayer-entity')
 const throttle = require('lodash.throttle');
 const {v4: uuidv4} = require('uuid');
@@ -25,7 +25,7 @@ function VoxelMultiplayer(game, opts) {
     if (!this.entities) throw new Error('voxel-multiplayer requires voxel-multiplayer-entities');
 
     this.sidToPid = {}
-    this.positionSendInMs = opts.positionSendInMs || 10;
+    this.positionSendInMs = opts.positionSendInMs || 100;
 
     this.enable()
 }
@@ -36,6 +36,8 @@ VoxelMultiplayer.prototype.enable = function () {
     this.meshPid = uuidv4()
 
     this.mesh = peerjsmesh.mesh('matusfaro-voxel-4d', {
+        log_id: this.meshPid,
+        retry: true,
         initData: {
             pid: this.meshPid,
             pos: self.getPlayerPositionXyzw(),

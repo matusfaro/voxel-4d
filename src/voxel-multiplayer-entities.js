@@ -110,7 +110,7 @@ VoxelMultiplayerEntities.prototype.update = function () {
     if (!tileUV) throw new Error('failed to load decal texture');
 
     Object.values(this.entities).forEach(function (entity) {
-        const positionXyz = self.voxel4d.location.pUntransformer(entity.position[0], entity.position[1], entity.position[2], entity.position[3]);
+        const positionXyz = self.voxel4d.location.pUntransformerWithShift(entity.position[0], entity.position[1], entity.position[2], entity.position[3]);
         if (!positionXyz) {
             return // this entity is in another dimension
         }

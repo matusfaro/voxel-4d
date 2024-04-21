@@ -3,7 +3,6 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@manishiitg/peerjs-mesh": "^0.0.39",
     "camera-debug": "^0.3.0",
     "ever": "0.0.3",
     "extend": "3.0.2",
