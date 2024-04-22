@@ -43,7 +43,9 @@ VoxelMultiplayer.prototype.enable = function () {
 
     this.mesh = peerjsmesh.mesh('matusfaro-voxel-4d', {
         log_id: this.meshPid,
-        retry: true,
+        retry: Infinity,
+        join_timeout: 10 * 1000,
+        mesh_mode: 'host', // 'host' for centralized or 'full' for full mesh/mess
         initData: {
             pid: this.meshPid,
             pos: self.getPlayerPositionXyzw(),
@@ -87,6 +89,14 @@ VoxelMultiplayer.prototype.enable = function () {
     });
 
     this.game.on('tick', this.onTickSendPosition = throttle(function () {
+        const playerPositionXyzw = self.getPlayerPositionXyzw();
+        if (this.lastPositionXyzw && this.lastPositionXyzw.every(function (value, index) {
+            return value === playerPositionXyzw[index]
+        })) {
+            return // Skip if position hasn't changed
+        }
+        this.lastPositionXyzw = playerPositionXyzw
+
         self.mesh.send({
             pid: self.meshPid,
             cmd: 'move',

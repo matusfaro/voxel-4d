@@ -84,7 +84,7 @@
     "start": "beefy src/index.js:index.js --watchify --port 7080 --cwd src -- --debug",
     "watch": "webpack --watch",
     "serve": "serve dist/",
-    "build": "mkdir dist && cp -R src/assets dist && cp src/index.html src/favicon.ico dist/ && browserify src/index.js > dist/index.js"
+    "build": "rm -fr dist && mkdir dist && cp -R src/assets dist && cp src/index.html src/favicon.ico dist/ && browserify src/index.js > dist/index.js"
   },
   "browserify": {
     "transform": [
