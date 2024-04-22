@@ -1,13 +1,14 @@
-module.exports = function (game, position, positionFrequencyInMs) {
-    return new VoxelMultiplayerEntity(game, position, positionFrequencyInMs);
+module.exports = function (game, position, positionFrequencyInMs, color) {
+    return new VoxelMultiplayerEntity(game, position, positionFrequencyInMs, color);
 };
 
-function VoxelMultiplayerEntity(game, position, positionFrequencyInMs) {
+function VoxelMultiplayerEntity(game, position, positionFrequencyInMs, color) {
     this.game = game
     this.position = position
     this.positionTime = Date.now()
     this.lastPosition = position
     this.positionFrequencyInMs = positionFrequencyInMs
+    this.color = color
 }
 
 VoxelMultiplayerEntity.prototype.move = function (position) {
@@ -28,4 +29,8 @@ VoxelMultiplayerEntity.prototype.getPosition = function () {
         const w = this.lastPosition[3] + (this.position[3] - this.lastPosition[3]) * perc
         return [x, y, z, w]
     }
+}
+
+VoxelMultiplayerEntity.prototype.getColor = function () {
+    return this.color
 }

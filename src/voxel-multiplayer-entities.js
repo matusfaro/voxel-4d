@@ -105,16 +105,16 @@ VoxelMultiplayerEntities.prototype.update = function () {
     var vertices = [];
     var uvArray = [];
 
-    // texturing (textures loaded from voxel-stitch updateTexture event)
-    var tileUV = self.stitchPlugin.getTextureUV('glass_green');
-    if (!tileUV) throw new Error('failed to load decal texture');
-
     Object.values(this.entities).forEach(function (entity) {
         const positionXyzw = entity.getPosition()
         const positionXyz = self.voxel4d.location.pUntransformerWithShift(positionXyzw[0], positionXyzw[1], positionXyzw[2], positionXyzw[3]);
         if (!positionXyz) {
             return // this entity is in another dimension
         }
+
+        // texturing (textures loaded from voxel-stitch updateTexture event)
+        var tileUV = self.stitchPlugin.getTextureUV(`glass_${entity.getColor()}`);
+        if (!tileUV) throw new Error('failed to load decal texture');
 
         const cube = getCube(positionXyz);
 

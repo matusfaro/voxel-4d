@@ -10,6 +10,7 @@ module.exports = function (game, opts) {
 module.exports.pluginInfo = {
     loadAfter: [
         'voxel-4d',
+        'voxel-glass',
         'voxel-multiplayer-entities',
         'voxel-engine-stackgl', // For WebGL to be ready
     ]
@@ -21,11 +22,16 @@ function VoxelMultiplayer(game, opts) {
     this.voxel4d = game.plugins.get('voxel-4d');
     if (!this.voxel4d) throw new Error('voxel-multiplayer requires voxel-4d plugin');
 
+    this.glassPlugin = game.plugins.get('voxel-glass');
+    if (!this.glassPlugin) throw new Error('voxel-multiplayer requires voxel-glass plugin');
+
     this.entities = this.game.plugins.get('voxel-multiplayer-entities');
     if (!this.entities) throw new Error('voxel-multiplayer requires voxel-multiplayer-entities');
 
     this.sidToPid = {}
     this.positionFrequencyInMs = opts.positionFrequencyInMs || 200;
+
+    this.myColor = this.getRandomColor()
 
     this.enable()
 }
@@ -41,11 +47,12 @@ VoxelMultiplayer.prototype.enable = function () {
         initData: {
             pid: this.meshPid,
             pos: self.getPlayerPositionXyzw(),
+            color: self.myColor
         }
     })
     this.mesh.on("initData", this.onInitData = function (sid, data) {
         self.sidToPid[sid] = data.pid
-        self.entities.addEntity(data.pid, new VoxelMultiplayerEntity(self.game, data.pos, self.positionFrequencyInMs))
+        self.entities.addEntity(data.pid, new VoxelMultiplayerEntity(self.game, data.pos, self.positionFrequencyInMs, data.color || 'green'))
     })
     this.mesh.on("data", this.onData = function (data) {
         const entity = self.entities.getEntity(data.pid)
@@ -93,6 +100,10 @@ VoxelMultiplayer.prototype.enable = function () {
 VoxelMultiplayer.prototype.getPlayerPositionXyzw = function () {
     const playerPosition = this.game.playerPosition()
     return this.voxel4d.location.pTransformer(playerPosition[0], playerPosition[1], playerPosition[2])
+}
+
+VoxelMultiplayer.prototype.getRandomColor = function () {
+    return this.glassPlugin.colors[Math.floor(Math.random() * this.glassPlugin.colors.length)]
 }
 
 VoxelMultiplayer.prototype.disable = function () {
