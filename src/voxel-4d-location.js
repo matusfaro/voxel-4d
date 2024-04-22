@@ -82,7 +82,7 @@ Voxel4DLocation.prototype.pUntransformer = function (x, y, z, w) {
         z - this.offsets.z,
         w - this.offsets.w,
     ];
-    if (Math.floor(xyzwTransformed[this.xyzwAxisToIndex[this.otherPlaneAxis]]) !== 0) {
+    if (xyzwTransformed[this.xyzwAxisToIndex[this.otherPlaneAxis]] !== 0) {
         // this position is in another dimension
         return null
     }
@@ -94,6 +94,9 @@ Voxel4DLocation.prototype.pUntransformer = function (x, y, z, w) {
 }
 
 
+/**
+ * Special untransformer that allows for a brief view of an entity crossing your dimension.
+ */
 Voxel4DLocation.prototype.pUntransformerWithShift = function (x, y, z, w) {
     const xyzwTransformed = [
         x - this.offsets.x,

@@ -25,7 +25,7 @@ function VoxelMultiplayer(game, opts) {
     if (!this.entities) throw new Error('voxel-multiplayer requires voxel-multiplayer-entities');
 
     this.sidToPid = {}
-    this.positionSendInMs = opts.positionSendInMs || 100;
+    this.positionFrequencyInMs = opts.positionFrequencyInMs || 200;
 
     this.enable()
 }
@@ -45,14 +45,18 @@ VoxelMultiplayer.prototype.enable = function () {
     })
     this.mesh.on("initData", this.onInitData = function (sid, data) {
         self.sidToPid[sid] = data.pid
-        self.entities.addEntity(data.pid, new VoxelMultiplayerEntity(self.game, data.pos))
+        self.entities.addEntity(data.pid, new VoxelMultiplayerEntity(self.game, data.pos, self.positionFrequencyInMs))
     })
     this.mesh.on("data", this.onData = function (data) {
         const entity = self.entities.getEntity(data.pid)
         if (!entity) {
             return
         }
-        entity.move(data.pos)
+        if (data.cmd === 'move') {
+            entity.move(data.pos)
+        } else if (data.cmd === 'setBlock') {
+            self.voxel4d.setBlockXyzwAndReloadChunk(data.pos, data.val)
+        }
     })
     this.mesh.on("peerdropped", this.onPeerdropped = function (sid, peerlist) {
         const pid = self.sidToPid[sid]
@@ -64,12 +68,24 @@ VoxelMultiplayer.prototype.enable = function () {
     this.mesh.on("error", this.onError = function (msg) {
         console.error("PeerJS Mesh Error: " + msg)
     })
+    // Keep track of added/deleted blocks
+    this.game.on('setBlock', this.onSetBlock = function (position, value, old) {
+        const pTransformed = self.voxel4d.location.pTransformer(position[0], position[1], position[2])
+        self.mesh.send({
+            pid: self.meshPid,
+            cmd: 'setBlock',
+            pos: pTransformed,
+            val: value,
+        })
+    });
+
     this.game.on('tick', this.onTickSendPosition = throttle(function () {
         self.mesh.send({
             pid: self.meshPid,
+            cmd: 'move',
             pos: self.getPlayerPositionXyzw(),
         })
-    }, this.positionSendInMs));
+    }, this.positionFrequencyInMs));
 
     this.game.on('tick', this.onTickRender = this.render.bind(this))
 }
@@ -85,6 +101,8 @@ VoxelMultiplayer.prototype.disable = function () {
     this.mesh.removeListener("peerdropped", this.onPeerdropped)
     this.mesh.removeListener("error", this.onError)
     this.mesh.cleanup()
+
+    this.game.removeListener('setBlock', this.onSetBlock);
 
     this.game.removeListener('tick', this.onTickSendPosition)
     this.game.removeListener('tick', this.onTickRender)

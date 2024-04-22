@@ -113,8 +113,22 @@ Voxel4D.prototype.workerMessage = function (event) {
     }
 };
 
-Voxel4D.prototype.setBlock = function (position, value, old) {
+Voxel4D.prototype.setBlock = function (position, value) {
     this.worker.postMessage({cmd: 'setBlock', position: position, value: value})
+};
+
+Voxel4D.prototype.setBlockXyzwAndReloadChunk = function (position, value) {
+    this.worker.postMessage({cmd: 'setBlockXyzw', position: position, value: value})
+    const positionXyz = this.location.pUntransformer(position[0], position[1], position[2], position[3])
+    // Check if this block is in our dimension
+    if (positionXyz !== null) {
+        const chunkPosition = this.game.voxels.chunkAtPosition(positionXyz)
+        // Check if a block is loaded at this position
+        if (chunkPosition) {
+            // Reload the chunk
+            this.missingChunk(chunkPosition)
+        }
+    }
 };
 
 Voxel4D.prototype.missingChunk = function (position) {

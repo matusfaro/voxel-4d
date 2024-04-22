@@ -110,7 +110,8 @@ VoxelMultiplayerEntities.prototype.update = function () {
     if (!tileUV) throw new Error('failed to load decal texture');
 
     Object.values(this.entities).forEach(function (entity) {
-        const positionXyz = self.voxel4d.location.pUntransformerWithShift(entity.position[0], entity.position[1], entity.position[2], entity.position[3]);
+        const positionXyzw = entity.getPosition()
+        const positionXyz = self.voxel4d.location.pUntransformerWithShift(positionXyzw[0], positionXyzw[1], positionXyzw[2], positionXyzw[3]);
         if (!positionXyz) {
             return // this entity is in another dimension
         }
@@ -190,9 +191,10 @@ VoxelMultiplayerEntities.prototype.render = function (deltaTime) {
 }
 
 function getCube(position) {
-    const x = position[0];
+    // Subtract half to center the cube around the position
+    const x = position[0] - 0.5;
     const y = position[1];
-    const z = position[2];
+    const z = position[2] - 0.5;
 
     return [
         // Back face

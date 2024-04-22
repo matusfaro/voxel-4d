@@ -34,7 +34,11 @@ function Voxel4DWorker(worker, opts) {
 
 Voxel4DWorker.prototype.setBlock = function (position, value) {
     const pTransformed = this.location.pTransformer(position[0], position[1], position[2])
-    const key = pTransformed.join('|')
+    this.setBlockXyzw(pTransformed, value)
+};
+
+Voxel4DWorker.prototype.setBlockXyzw = function (position, value) {
+    const key = position.join('|')
     this.blocks[key] = value
 };
 
@@ -120,6 +124,8 @@ module.exports = function () {
             self.queueGenerateChunk(event.data.position);
         } else if (event.data.cmd === 'setBlock') {
             self.setBlock(event.data.position, event.data.value);
+        } else if (event.data.cmd === 'setBlockXyzw') {
+            self.setBlockXyzw(event.data.position, event.data.value);
         } else if (event.data.cmd === 'dimensionAxisSwitch') {
             self.dimensionAxisSwitch(event.data.facingAxis, event.data.playerPosition);
         } else if (event.data.cmd === 'dimensionIncrement') {
