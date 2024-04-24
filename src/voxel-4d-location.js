@@ -1,3 +1,6 @@
+const inherits = require('inherits')
+const EventEmitter = require('events').EventEmitter
+
 module.exports = function () {
     return new Voxel4DLocation();
 };
@@ -34,8 +37,12 @@ function Voxel4DLocation() {
     }
 }
 
+inherits(Voxel4DLocation, EventEmitter)
+
 Voxel4DLocation.prototype.dimensionAxisSwitch = function (facingAxis, playerPosition) {
-    const swapAxis = facingAxis === 'y' ? 'y' : (facingAxis === 'x' ? 'z' : 'x')
+    const swapAxis = facingAxis
+    // Swap axis you're not looking at
+    // const swapAxis = facingAxis === 'y' ? 'y' : (facingAxis === 'x' ? 'z' : 'x')
 
     // Swap axis values first
     const swapVirtualAxisFrom = this.currentPlaneAxis[this.xyzwAxisToIndex[swapAxis]]
@@ -48,6 +55,8 @@ Voxel4DLocation.prototype.dimensionAxisSwitch = function (facingAxis, playerPosi
     let tempAxis = this.otherPlaneAxis;
     this.otherPlaneAxis = this.currentPlaneAxis[this.xyzwAxisToIndex[swapAxis]];
     this.currentPlaneAxis[this.xyzwAxisToIndex[swapAxis]] = tempAxis;
+
+    this.emit('dimensionAxisSwitch', this.currentPlaneAxis, this.otherPlaneAxis)
 }
 
 Voxel4DLocation.prototype.dimensionIncrement = function (increment) {

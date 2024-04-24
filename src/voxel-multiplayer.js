@@ -1,3 +1,5 @@
+const inherits = require('inherits')
+const EventEmitter = require('events').EventEmitter
 const peerjsmesh = require("./lib/peerjs-mesh/mesh")
 const VoxelMultiplayerEntity = require('./voxel-multiplayer-entity')
 const throttle = require('lodash.throttle');
@@ -36,6 +38,8 @@ function VoxelMultiplayer(game, opts) {
     this.enable()
 }
 
+inherits(VoxelMultiplayer, EventEmitter)
+
 VoxelMultiplayer.prototype.enable = function () {
     const self = this
 
@@ -54,7 +58,9 @@ VoxelMultiplayer.prototype.enable = function () {
     })
     this.mesh.on("initData", this.onInitData = function (sid, data) {
         self.sidToPid[sid] = data.pid
-        self.entities.addEntity(data.pid, new VoxelMultiplayerEntity(self.game, data.pos, self.positionFrequencyInMs, data.color || 'green'))
+        const color = data.color || 'green'
+        self.entities.addEntity(data.pid, new VoxelMultiplayerEntity(self.game, data.pos, self.positionFrequencyInMs, color))
+        self.emit('playerAdded', data.pid, color, data.pos)
     })
     this.mesh.on("data", this.onData = function (data) {
         const entity = self.entities.getEntity(data.pid)
@@ -63,6 +69,7 @@ VoxelMultiplayer.prototype.enable = function () {
         }
         if (data.cmd === 'move') {
             entity.move(data.pos)
+            self.emit('playerMove', data.pid, data.pos)
         } else if (data.cmd === 'setBlock') {
             self.voxel4d.setBlockXyzwAndReloadChunk(data.pos, data.val)
         }
@@ -73,6 +80,7 @@ VoxelMultiplayer.prototype.enable = function () {
             return
         }
         self.entities.removeEntity(pid)
+        self.emit('playerRemoved', pid)
     })
     this.mesh.on("error", this.onError = function (msg) {
         console.error("PeerJS Mesh Error: " + msg)

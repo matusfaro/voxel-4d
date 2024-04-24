@@ -5,12 +5,12 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
-  '@manishiitg/peerjs-mesh':
-    specifier: ^0.0.39
-    version: 0.0.39
   camera-debug:
     specifier: ^0.3.0
     version: 0.3.0
+  events:
+    specifier: ^3.3.0
+    version: 3.3.0
   ever:
     specifier: 0.0.3
     version: 0.0.3
@@ -35,6 +35,9 @@ dependencies:
   glslify-loader:
     specifier: ^2.0.0
     version: 2.0.0
+  inherits:
+    specifier: ^2.0.4
+    version: 2.0.4
   kb-bindings-ui:
     specifier: ^0.3.3
     version: 0.3.3
@@ -325,12 +328,6 @@ packages:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.4.15
-    dev: false
-
-  /@manishiitg/peerjs-mesh@0.0.39:
-    resolution: {integrity: sha512-/0j050ZybPERbz7Y/4FAaedbzOwg0oFzKybZgWCeZniJQvTtU5fyp146SWGUtZSKmW/Yq0HcfVUghWwKc21H5A==}
-    dependencies:
-      peerjs: 1.5.2
     dev: false
 
   /@msgpack/msgpack@2.8.0:

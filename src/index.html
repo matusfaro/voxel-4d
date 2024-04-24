@@ -42,11 +42,17 @@
             gap: 5px;
         }
 
-        .position-container {
+        #position-container {
             color: white;
             display: flex;
             align-items: start;
             z-index: 1;
+            gap: 15px;
+        }
+
+        #position-others {
+            display: flex;
+            flex-direction: column;
         }
 
         .position {
@@ -60,18 +66,26 @@
             justify-content: space-between;
         }
 
+        .position-locked {
+            color: #ffdbdb;
+        }
+
     </style>
 </head>
 <body>
 <div class="menu-topleft">
     <img src="assets/voxel-engine.png">
-    <div class="position-container">
+    <div id="position-container">
         <div class="position">
+            Position
             <div id="position-visual"></div>
             <div>X: <span id="position-x"></span></div>
             <div>Y: <span id="position-y"></span></div>
             <div>Z: <span id="position-z"></span></div>
-            <div>W: <span id="position-w"></span></div>
+            <div class="position-locked">W: <span id="position-w"></span></div>
+        </div>
+        <div id="position-others">
+            Others
         </div>
     </div>
 </div>
