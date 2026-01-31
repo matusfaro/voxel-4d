@@ -39,10 +39,7 @@ function Voxel4DLocation() {
 
 inherits(Voxel4DLocation, EventEmitter)
 
-Voxel4DLocation.prototype.dimensionAxisSwitch = function (facingAxis, playerPosition) {
-    const swapAxis = facingAxis
-    // Swap axis you're not looking at
-    // const swapAxis = facingAxis === 'y' ? 'y' : (facingAxis === 'x' ? 'z' : 'x')
+Voxel4DLocation.prototype.dimensionAxisSwitch = function (swapAxis, playerPosition) {
 
     // Swap axis values first
     const swapVirtualAxisFrom = this.currentPlaneAxis[this.xyzwAxisToIndex[swapAxis]]

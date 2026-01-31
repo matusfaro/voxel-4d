@@ -1,7 +1,7 @@
 exports.setScene = function (game, setBlock) {
     // game.scene.fog = new game.THREE.Fog(0x000000, 10, 1000)
 
-    addHouse(setBlock, -34, -15, -30, -20, 14)
+    addHouse(setBlock, -10, -38, -2, -30, 20)
 }
 
 function addHouse(setBlock, fromX, fromZ, toX, toZ, y) {
