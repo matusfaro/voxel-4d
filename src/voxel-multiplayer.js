@@ -35,6 +35,10 @@ function VoxelMultiplayer(game, opts) {
 
     this.myColor = this.getRandomColor()
 
+    // Per-player map (see plan): each peer picks its own map; we signal ours to
+    // others and only interact with peers on the same map.
+    this.currentMapId = this.voxel4d.currentMapId
+
     this.enable()
 }
 
@@ -53,14 +57,17 @@ VoxelMultiplayer.prototype.enable = function () {
         initData: {
             pid: this.meshPid,
             pos: self.getPlayerPositionXyzw(),
-            color: self.myColor
+            color: self.myColor,
+            map: self.currentMapId
         }
     })
     this.mesh.on("initData", this.onInitData = function (sid, data) {
         self.sidToPid[sid] = data.pid
         const color = data.color || 'green'
-        self.entities.addEntity(data.pid, new VoxelMultiplayerEntity(self.game, data.pos, self.positionFrequencyInMs, color))
-        self.emit('playerAdded', data.pid, color, data.pos)
+        const entity = new VoxelMultiplayerEntity(self.game, data.pos, self.positionFrequencyInMs, color)
+        entity.mapId = data.map || 0
+        self.entities.addEntity(data.pid, entity)
+        self.emit('playerAdded', data.pid, color, data.pos, entity.mapId)
     })
     this.mesh.on("data", this.onData = function (data) {
         const entity = self.entities.getEntity(data.pid)
@@ -71,7 +78,14 @@ VoxelMultiplayer.prototype.enable = function () {
             entity.move(data.pos)
             self.emit('playerMove', data.pid, data.pos)
         } else if (data.cmd === 'setBlock') {
-            self.voxel4d.setBlockXyzwAndReloadChunk(data.pos, data.val)
+            // Only apply edits made on the map we're currently in; edits on other
+            // maps are ignored so different-map worlds stay coherent.
+            if ((data.map || 0) === self.currentMapId) {
+                self.voxel4d.setBlockXyzwAndReloadChunk(data.pos, data.val, self.currentMapId)
+            }
+        } else if (data.cmd === 'setMap') {
+            entity.mapId = data.map
+            self.emit('playerMapChanged', data.pid, data.map)
         }
     })
     this.mesh.on("peerdropped", this.onPeerdropped = function (sid, peerlist) {
@@ -93,7 +107,17 @@ VoxelMultiplayer.prototype.enable = function () {
             cmd: 'setBlock',
             pos: pSnapped,
             val: value,
+            map: self.currentMapId,
         })
+    });
+
+    // Signal our map to peers when we switch, so they can show it and scope
+    // interaction. Also let the entities renderer know which map we're viewing.
+    this.entities.setLocalMapId(this.currentMapId)
+    this.voxel4d.on('mapSwitch', this.onMapSwitch = function (mapId) {
+        self.currentMapId = mapId
+        self.entities.setLocalMapId(mapId)
+        self.mesh.send({pid: self.meshPid, cmd: 'setMap', map: mapId})
     });
 
     this.game.on('tick', this.onTickSendPosition = throttle(function () {
@@ -132,6 +156,7 @@ VoxelMultiplayer.prototype.disable = function () {
     this.mesh.cleanup()
 
     this.game.removeListener('setBlock', this.onSetBlock);
+    this.voxel4d.removeListener('mapSwitch', this.onMapSwitch);
 
     this.game.removeListener('tick', this.onTickSendPosition)
     this.game.removeListener('tick', this.onTickRender)
