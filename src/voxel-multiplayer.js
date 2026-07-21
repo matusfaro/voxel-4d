@@ -87,11 +87,11 @@ VoxelMultiplayer.prototype.enable = function () {
     })
     // Keep track of added/deleted blocks
     this.game.on('setBlock', this.onSetBlock = function (position, value, old) {
-        const pTransformed = self.voxel4d.location.pTransformer(position[0], position[1], position[2])
+        const pSnapped = self.voxel4d.location.pTransformerSnapped(position[0], position[1], position[2])
         self.mesh.send({
             pid: self.meshPid,
             cmd: 'setBlock',
-            pos: pTransformed,
+            pos: pSnapped,
             val: value,
         })
     });

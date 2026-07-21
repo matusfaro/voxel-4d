@@ -78,7 +78,14 @@ VoxelGps.prototype.dimensionAxisSwitch = function (currentPlaneAxis, otherPlaneA
     this.zEl.parentNode?.classList.remove('position-locked')
     this.wEl.parentNode?.classList.remove('position-locked')
 
-    this[`${otherPlaneAxis}El`]?.parentNode?.classList.add('position-locked')
+    // Highlight all axes that the hidden direction touches
+    var lockedAxes = this.voxel4d.location.getLockedAxes()
+    for (var i = 0; i < lockedAxes.length; i++) {
+        var el = this[lockedAxes[i] + 'El']
+        if (el && el.parentNode) {
+            el.parentNode.classList.add('position-locked')
+        }
+    }
 };
 
 VoxelGps.prototype.playerAdded = function (id, color, playerPosition) {

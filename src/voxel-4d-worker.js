@@ -33,8 +33,8 @@ function Voxel4DWorker(worker, opts) {
 };
 
 Voxel4DWorker.prototype.setBlock = function (position, value) {
-    const pTransformed = this.location.pTransformer(position[0], position[1], position[2])
-    this.setBlockXyzw(pTransformed, value)
+    var pSnapped = this.location.pTransformerSnapped(position[0], position[1], position[2])
+    this.setBlockXyzw(pSnapped, value)
 };
 
 Voxel4DWorker.prototype.setBlockXyzw = function (position, value) {
@@ -42,8 +42,18 @@ Voxel4DWorker.prototype.setBlockXyzw = function (position, value) {
     this.blocks[key] = value
 };
 
-Voxel4DWorker.prototype.getBlockModified = function (pTransformed) {
-    return this.blocks[pTransformed.join('|')]
+/**
+ * @param {number[][]} blocks - array of [x, y, z, w, value]
+ */
+Voxel4DWorker.prototype.setBlocksXyzw = function (blocks) {
+    for (var i = 0; i < blocks.length; i++) {
+        var b = blocks[i];
+        this.setBlockXyzw([b[0], b[1], b[2], b[3]], b[4]);
+    }
+};
+
+Voxel4DWorker.prototype.getBlockModified = function (pSnapped) {
+    return this.blocks[pSnapped.join('|')]
 };
 
 Voxel4DWorker.prototype.generateChunk = function (position) {
@@ -58,17 +68,26 @@ Voxel4DWorker.prototype.generateChunk = function (position) {
     var startX = position[0] * this.width
     var startY = position[1] * this.width
     var startZ = position[2] * this.width
+
+    // Check if y-basis-vector is pure [0,1,0,0] for Perlin cache optimization
+    var b = this.location.basisMatrix;
+    var yAxisIsPure = b[0][1] === 0 && b[1][1] === 1 && b[2][1] === 0 && b[3][1] === 0;
+
     var perlinGenMountainCachePos
     var perlinGenMountainCacheVal
     pointsInside(startX, startY, startZ, this.width, function (x, y, z) {
+        // Fractional transform for Perlin noise (continuous)
         const pTransform = self.location.pTransformer(x, y, z)
         const xTransformed = pTransform[0]
         const yTransformed = pTransform[1]
         const zTransformed = pTransform[2]
         const wTransformed = pTransform[3]
 
+        // Snapped transform for block override lookup and texture determination
+        const pSnapped = self.location.pTransformerSnapped(x, y, z)
+
         // Apply any user modifications
-        const blockOverride = self.getBlockModified(pTransform)
+        const blockOverride = self.getBlockModified(pSnapped)
         if (blockOverride !== undefined) {
             setBlock(chunk, self.width, x, y, z, blockOverride)
             return
@@ -76,19 +95,24 @@ Voxel4DWorker.prototype.generateChunk = function (position) {
 
         // Generate mountains
         {
-            // Cache value. If Y is constant, we don't need to re-generate this value for every Y in the chunk
+            // Cache value. If Y basis is pure, varying y doesn't affect x,z,w noise inputs
             let perlinGenMountain
-            let perlinGenMountainCacheKey = [xTransformed, zTransformed, wTransformed].join('|')
-            if (perlinGenMountainCachePos === perlinGenMountainCacheKey) {
-                perlinGenMountain = perlinGenMountainCacheVal
+            if (yAxisIsPure) {
+                let perlinGenMountainCacheKey = [xTransformed, zTransformed, wTransformed].join('|')
+                if (perlinGenMountainCachePos === perlinGenMountainCacheKey) {
+                    perlinGenMountain = perlinGenMountainCacheVal
+                } else {
+                    perlinGenMountain = noise.simplex3(xTransformed / self.divisorMountains, zTransformed / self.divisorMountains, wTransformed / self.divisorMountains)
+                    perlinGenMountainCacheVal = perlinGenMountain
+                    perlinGenMountainCachePos = perlinGenMountainCacheKey
+                }
             } else {
+                // Y-axis affects noise axes, can't cache
                 perlinGenMountain = noise.simplex3(xTransformed / self.divisorMountains, zTransformed / self.divisorMountains, wTransformed / self.divisorMountains)
-                perlinGenMountainCacheVal = perlinGenMountain
-                perlinGenMountainCachePos = perlinGenMountainCacheKey
             }
             const mountainPeak = ~~scale(perlinGenMountain, -0.5, 0.5, self.floor + 1, self.ceiling)
-            if (mountainPeak >= yTransformed) {
-                setBlock(chunk, self.width, x, y, z, self.determineTexture(xTransformed, yTransformed, zTransformed, wTransformed))
+            if (mountainPeak >= pSnapped[1]) {
+                setBlock(chunk, self.width, x, y, z, self.determineTexture(pSnapped[0], pSnapped[1], pSnapped[2], pSnapped[3]))
             }
         }
     })
@@ -96,21 +120,13 @@ Voxel4DWorker.prototype.generateChunk = function (position) {
     this.worker.postMessage({cmd: 'chunkGenerated', position: position, voxelBuffer: buffer}, [buffer]);
 };
 
-Voxel4DWorker.prototype.dimensionAxisSwitch = function (facingAxis, playerPosition) {
-
-    this.location.dimensionAxisSwitch(facingAxis, playerPosition)
-
-    // Set block underneath the player
-    // let blockUnderneathPlayerPosition = [playerPosition[0], playerPosition[1] - 1, playerPosition[2]];
-    // while (blockUnderneathPlayerPosition[1] > -10 && game.getBlock(blockUnderneathPlayerPosition) === 0) {
-    //     // Keep looking for a block
-    //     blockUnderneathPlayerPosition[1] -= 1;
-    // }
-    // game.setBlock(blockUnderneathPlayerPosition, 2)
-};
-
-Voxel4DWorker.prototype.dimensionIncrement = function (increment) {
-    this.location.dimensionIncrement(increment)
+Voxel4DWorker.prototype.syncLocationState = function (basisMatrix, origin) {
+    for (var i = 0; i < 4; i++) {
+        for (var j = 0; j < 4; j++) {
+            this.location.basisMatrix[i][j] = basisMatrix[i][j];
+        }
+        this.location.origin[i] = origin[i];
+    }
 };
 
 module.exports = function () {
@@ -126,10 +142,10 @@ module.exports = function () {
             self.setBlock(event.data.position, event.data.value);
         } else if (event.data.cmd === 'setBlockXyzw') {
             self.setBlockXyzw(event.data.position, event.data.value);
-        } else if (event.data.cmd === 'dimensionAxisSwitch') {
-            self.dimensionAxisSwitch(event.data.facingAxis, event.data.playerPosition);
-        } else if (event.data.cmd === 'dimensionIncrement') {
-            self.dimensionIncrement(event.data.increment);
+        } else if (event.data.cmd === 'setBlocksXyzw') {
+            self.setBlocksXyzw(event.data.blocks);
+        } else if (event.data.cmd === 'syncLocationState') {
+            self.syncLocationState(event.data.basisMatrix, event.data.origin);
         } else {
             console.error('Unknown message from main', event.data)
         }

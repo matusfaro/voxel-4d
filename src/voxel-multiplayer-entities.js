@@ -68,15 +68,18 @@ VoxelMultiplayerEntities.prototype.init = function () {
         glslify("/* voxel-decals vertex shader */\
 attribute vec3 position;\
 attribute vec2 uv;\
+attribute float alpha;\
 \
 uniform mat4 projection;\
 uniform mat4 view;\
 uniform mat4 model;\
 varying vec2 vUv;\
+varying float vAlpha;\
 \
 void main() {\
   gl_Position = projection * view * model * vec4(position, 1.0);\
   vUv = uv;\
+  vAlpha = alpha;\
 }", {inline: true}),
 
         glslify("/* voxel-decals fragment shader */\
@@ -84,9 +87,11 @@ precision highp float;\
 \
 uniform sampler2D texture;\
 varying vec2 vUv;\
+varying float vAlpha;\
 \
 void main() {\
-  gl_FragColor = texture2D(texture, vUv);\
+  vec4 texColor = texture2D(texture, vUv);\
+  gl_FragColor = vec4(texColor.rgb, texColor.a * vAlpha);\
 }", {inline: true}));
 }
 
@@ -104,12 +109,25 @@ VoxelMultiplayerEntities.prototype.update = function () {
 
     var vertices = [];
     var uvArray = [];
+    var alphaArray = [];
 
     Object.values(this.entities).forEach(function (entity) {
         const positionXyzw = entity.getPosition()
-        const positionXyz = self.voxel4d.location.pUntransformerWithShift(positionXyzw[0], positionXyzw[1], positionXyzw[2], positionXyzw[3]);
-        if (!positionXyz) {
+        const result = self.voxel4d.location.pUntransformerWithShift(positionXyzw[0], positionXyzw[1], positionXyzw[2], positionXyzw[3]);
+        if (!result) {
             return // this entity is in another dimension
+        }
+        var positionXyz = result;
+        var hiddenDist = result[3]; // absolute hidden component distance
+
+        // Fade: 1.0 within ±1 block, linear fade to 0.5 at ±2 blocks, 0.5 beyond
+        var entityAlpha;
+        if (hiddenDist <= 1) {
+            entityAlpha = 1.0;
+        } else if (hiddenDist <= 2) {
+            entityAlpha = 1.0 - 0.5 * (hiddenDist - 1);
+        } else {
+            entityAlpha = 0.5;
         }
 
         // texturing (textures loaded from voxel-stitch updateTexture event)
@@ -117,8 +135,14 @@ VoxelMultiplayerEntities.prototype.update = function () {
         if (!tileUV) throw new Error('failed to load decal texture');
 
         const cube = getCube(positionXyz);
+        var vertexCount = cube.length / 3;
 
         vertices = vertices.concat(cube);
+
+        // Per-vertex alpha (same for all vertices of this entity)
+        for (var v = 0; v < vertexCount; v++) {
+            alphaArray.push(entityAlpha);
+        }
 
         // cover the texture tile over the two triangles forming a flat plane
         var planeUV = [
@@ -153,6 +177,7 @@ VoxelMultiplayerEntities.prototype.update = function () {
 
     var verticesBuf = createBuffer(gl, new Float32Array(vertices));
     var uvBuf = createBuffer(gl, uv);
+    var alphaBuf = createBuffer(gl, new Float32Array(alphaArray));
 
     this.mesh = createVAO(gl, [
         {
@@ -162,6 +187,10 @@ VoxelMultiplayerEntities.prototype.update = function () {
         {
             buffer: uvBuf,
             size: 2
+        },
+        {
+            buffer: alphaBuf,
+            size: 1
         }
     ]);
     this.mesh.length = vertices.length / 3;
@@ -176,9 +205,13 @@ VoxelMultiplayerEntities.prototype.render = function (deltaTime) {
 
     const gl = this.game.shell.gl;
 
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
     this.shader.bind();
     this.shader.attributes.position.location = 0;
     this.shader.attributes.uv.location = 1;
+    this.shader.attributes.alpha.location = 2;
     this.shader.uniforms.projection = this.shaderPlugin.projectionMatrix;
     this.shader.uniforms.view = this.shaderPlugin.viewMatrix;
     this.shader.uniforms.model = scratch0;
@@ -188,6 +221,8 @@ VoxelMultiplayerEntities.prototype.render = function (deltaTime) {
     this.mesh.bind();
     this.mesh.draw(gl.TRIANGLES, this.mesh.length);
     this.mesh.unbind();
+
+    gl.disable(gl.BLEND);
 }
 
 function getCube(position) {

@@ -128,7 +128,7 @@ const start = function () {
 
             'voxel-mesher': {},
             'game-shell-fps-camera': {
-                position: [0, -100, 0]
+                position: [0, -30, 0]
             },
 
             'voxel-artpacks': {},
