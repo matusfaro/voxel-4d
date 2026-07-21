@@ -19,6 +19,7 @@ module.exports.pluginInfo = {
 function VoxelMultiplayerEntities(game) {
     this.game = game
     this.entities = {}
+    this.localMapId = 0  // which map the local player is viewing; set by voxel-multiplayer
 
     this.voxel4d = game.plugins.get('voxel-4d');
     if (!this.voxel4d) throw new Error('voxel-multiplayer-entities requires voxel-4d plugin');
@@ -60,6 +61,11 @@ VoxelMultiplayerEntities.prototype.removeEntity = function (key) {
 
 VoxelMultiplayerEntities.prototype.removeAllEntities = function () {
     this.entities = {}
+}
+
+// Peers on a different map are hidden in-world (they're still listed in the HUD).
+VoxelMultiplayerEntities.prototype.setLocalMapId = function (mapId) {
+    this.localMapId = mapId
 }
 
 VoxelMultiplayerEntities.prototype.init = function () {
@@ -112,6 +118,9 @@ VoxelMultiplayerEntities.prototype.update = function () {
     var alphaArray = [];
 
     Object.values(this.entities).forEach(function (entity) {
+        if (entity.mapId !== undefined && entity.mapId !== self.localMapId) {
+            return // this entity is in another map/world
+        }
         const positionXyzw = entity.getPosition()
         const result = self.voxel4d.location.pUntransformerWithShift(positionXyzw[0], positionXyzw[1], positionXyzw[2], positionXyzw[3]);
         if (!result) {

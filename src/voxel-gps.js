@@ -30,29 +30,49 @@ function VoxelGps(game, opts) {
     this.wEl = document.getElementById('position-w')
     if (!this.wEl) throw Error('Cannot find element by id position-w')
 
+    this.mapEl = document.getElementById('position-map')
+    if (!this.mapEl) throw Error('Cannot find element by id position-map')
+
     this.containerEl = document.getElementById('position-others')
     if (!this.containerEl) throw Error('Cannot find element by id position-others')
 
+    this.maps = this.voxel4d.getMaps()
     this.playerToEl = {}
     this.playerToPosition = {}
+    this.playerToMap = {}
 
     this.enable();
 }
 
+VoxelGps.prototype.mapName = function (mapId) {
+    const m = this.maps[mapId]
+    return m ? m.name : ('#' + mapId)
+};
+
 VoxelGps.prototype.enable = function () {
+    this.mapEl.innerHTML = this.mapName(this.voxel4d.currentMapId)
     this.game.on('tick', this.onTick = this.update.bind(this))
     this.voxel4d.location.on('dimensionAxisSwitch', this.onDimensionAxisSwitch = this.dimensionAxisSwitch.bind(this))
+    this.voxel4d.on('mapSwitch', this.onMapSwitch = this.mapSwitch.bind(this))
     this.voxelMultiplayer.on('playerAdded', this.onPlayerAdded = this.playerAdded.bind(this))
     this.voxelMultiplayer.on('playerMove', this.onPlayerMove = this.playerMove.bind(this))
+    this.voxelMultiplayer.on('playerMapChanged', this.onPlayerMapChanged = this.playerMapChanged.bind(this))
     this.voxelMultiplayer.on('playerRemoved', this.onPlayerRemoved = this.playerRemoved.bind(this))
 };
 
 VoxelGps.prototype.disable = function () {
     this.game.removeListener('tick', this.onTick);
     this.voxel4d.location.removeListener('dimensionAxisSwitch', this.onDimensionAxisSwitch);
+    this.voxel4d.removeListener('mapSwitch', this.onMapSwitch);
     this.voxelMultiplayer.removeListener('playerAdded', this.onPlayerAdded);
     this.voxelMultiplayer.removeListener('playerMove', this.onPlayerMove);
+    this.voxelMultiplayer.removeListener('playerMapChanged', this.onPlayerMapChanged);
     this.voxelMultiplayer.removeListener('playerRemoved', this.onPlayerRemoved);
+};
+
+VoxelGps.prototype.mapSwitch = function (mapId, name) {
+    this.mapEl.innerHTML = name
+    this.refreshOtherPlayers()   // same/other-map dimming depends on our map
 };
 
 // API
@@ -88,7 +108,7 @@ VoxelGps.prototype.dimensionAxisSwitch = function (currentPlaneAxis, otherPlaneA
     }
 };
 
-VoxelGps.prototype.playerAdded = function (id, color, playerPosition) {
+VoxelGps.prototype.playerAdded = function (id, color, playerPosition, mapId) {
     if (!this.playerToEl[id]) {
         const el = document.createElement('div')
         el.classList.add('position-player')
@@ -96,8 +116,14 @@ VoxelGps.prototype.playerAdded = function (id, color, playerPosition) {
         this.playerToEl[id] = el
         this.containerEl.appendChild(el)
     }
+    this.playerToMap[id] = mapId || 0
 
     this.playerMove(id, playerPosition)
+};
+
+VoxelGps.prototype.playerMapChanged = function (id, mapId) {
+    this.playerToMap[id] = mapId
+    if (this.playerToPosition[id]) this.playerMove(id, this.playerToPosition[id])
 };
 
 VoxelGps.prototype.refreshOtherPlayers = function () {
@@ -123,7 +149,11 @@ VoxelGps.prototype.playerMove = function (id, playerPosition) {
         Math.pow(playerMePositionXyzw[3] - playerPosition[3], 2)
     )
 
-    el.innerHTML = distance.toFixed(1)
+    // Show each peer's map; dim those not on our map (they're hidden in-world).
+    const theirMap = this.playerToMap[id] || 0
+    const sameMap = theirMap === this.voxel4d.currentMapId
+    el.innerHTML = distance.toFixed(1) + ' · ' + this.mapName(theirMap)
+    el.style.opacity = sameMap ? '1' : '0.4'
 };
 
 VoxelGps.prototype.playerRemoved = function (id, color, position) {
@@ -132,4 +162,6 @@ VoxelGps.prototype.playerRemoved = function (id, color, position) {
         el.remove()
         delete this.playerToEl[id]
     }
+    delete this.playerToMap[id]
+    delete this.playerToPosition[id]
 };

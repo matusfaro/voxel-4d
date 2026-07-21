@@ -1,10 +1,13 @@
 'use strict';
 
+const inherits = require('inherits');
+const EventEmitter = require('events').EventEmitter;
 const webworkify = require('webworkify');
 const unworkify = require('unworkify');
 const ndarray = require('ndarray');
 const Voxel4dLocation = require('./voxel-4d-location');
 const level = require('./level');
+const {MAPS, PALETTE} = require('./maps');
 var createBuffer = require('gl-buffer');
 var createVAO = require('gl-vao');
 var glShader = require('gl-shader');
@@ -37,8 +40,12 @@ function Voxel4D(game, opts) {
     this.shaderPlugin = game.plugins.get('voxel-shader');
     if (!this.shaderPlugin) throw new Error('voxel-4d requires voxel-shader plugin');
 
+    this.currentMapId = 0;
+
     this.enable();
 }
+
+inherits(Voxel4D, EventEmitter)
 
 Voxel4D.prototype.enable = function () {
     const self = this
@@ -46,14 +53,14 @@ Voxel4D.prototype.enable = function () {
     this.location = new Voxel4dLocation()
 
     // Register blocks
-    const blockGrass = this.registry.registerBlock('grass', {
+    this.registry.registerBlock('grass', {
         texture: ['grass_top', 'dirt', 'grass_side'],
         hardness: 1.0,
         itemDrop: 'dirt',
         effectiveTool: 'spade'
     });
-    const blockDirt = this.registry.registerBlock('dirt', {texture: 'dirt', hardness: 0.75, effectiveTool: 'spade'});
-    const blockObsidian = this.registry.registerBlock('obsidian', {
+    this.registry.registerBlock('dirt', {texture: 'dirt', hardness: 0.75, effectiveTool: 'spade'});
+    this.registry.registerBlock('obsidian', {
         texture: 'obsidian',
         hardness: 128,
         requiredTool: 'pickaxe'
@@ -79,17 +86,10 @@ Voxel4D.prototype.enable = function () {
     else
         throw new Error('unknown game.arrayType: ' + this.game.arrayType)
 
-    this.worker.postMessage({
-        cmd: 'configure', opts: {
-            width: this.game.chunkSize,
-            pad: this.game.chunkPad,
-            arrayElementSize: arrayElementSize,
-            seed: 'foo',
-            blockGrass: blockGrass,
-            blockObsidian: blockObsidian,
-            blockDirt: blockDirt,
-        }
-    });
+    // The worker is configured at engine-init (below), not here: the map
+    // generators need block ids from plugins that load after voxel-4d, so the
+    // palette can only be resolved once every plugin has registered its blocks.
+    this.arrayElementSize = arrayElementSize;
 
     // Chunk loading
     this.game.voxels.on('missingChunk', this.onMissingChunk = this.missingChunk.bind(this));
@@ -105,23 +105,75 @@ Voxel4D.prototype.enable = function () {
     this.keys.down.on('dimension decrement', this.onDimensionDecrement = function () {
         self.dimensionIncrement(-1)
     });
+    this.keys.down.on('switch map', this.onSwitchMap = function () {
+        self.setMap((self.currentMapId + 1) % MAPS.length)
+    });
 
     // Dimension-swap plane animation
     this.activePlanes = [];
     this.game.shell.on('gl-init', this.onGlInit = this.glInit.bind(this));
     this.game.shell.on('gl-render', this.onGlRender = this.glRender.bind(this));
 
-    // Place the starting scene. Deferred to engine-init because level.js uses
-    // blocks from plugins (voxel-decorative, voxel-wool) that load after us,
-    // and because chunks are not generated until the stitcher is ready — so the
-    // overrides below are baked in as each chunk is generated.
+    // Configure the worker and place the starting scene. Deferred to engine-init:
+    // by then every plugin has registered its blocks, so (a) the generator palette
+    // resolves, and (b) level.js can use decorative/wool blocks. Chunks are not
+    // generated until the stitcher is ready (after engine-init), so overrides are
+    // baked in as each chunk generates.
     this.game.on('engine-init', this.onEngineInit = function () {
+        self.worker.postMessage({
+            cmd: 'configure', opts: {
+                width: self.game.chunkSize,
+                pad: self.game.chunkPad,
+                arrayElementSize: self.arrayElementSize,
+                palette: self.resolvePalette(),
+                mapId: self.currentMapId,
+            }
+        });
+
+        // Terrain (map 0) starting scene: the hilltop house.
         const blocks = [];
         level.setScene(self.registry, function (position, value) {
             blocks.push([position[0], position[1], position[2], position[3], value]);
         });
-        self.setBlocksXyzw(blocks);
+        self.setBlocksXyzw(blocks, 0);
+
+        self.registerMapCommand();
     });
+};
+
+/**
+ * Resolve every block name the map generators need to an engine block id.
+ * Unregistered names (e.g. from disabled plugins) fall back to obsidian so a
+ * generator never emits an undefined block.
+ */
+Voxel4D.prototype.resolvePalette = function () {
+    const fallback = this.registry.getBlockIndex('obsidian');
+    const palette = {};
+    for (var i = 0; i < PALETTE.length; i++) {
+        const name = PALETTE[i];
+        const id = this.registry.getBlockIndex(name);
+        palette[name] = (id === undefined) ? fallback : id;
+    }
+    return palette;
+};
+
+/**
+ * Register a `.map <name|index>` console command, if voxel-commands is present.
+ * Done at engine-init because voxel-commands loads after voxel-4d.
+ */
+Voxel4D.prototype.registerMapCommand = function () {
+    const self = this;
+    const commands = this.game.plugins.get('voxel-commands');
+    if (!commands) return;
+    commands.registerCommand('map', function (arg) {
+        if (arg === undefined) return 'Maps: ' + MAPS.map(function (m) { return m.id + '=' + m.name; }).join(', ');
+        var target = MAPS.filter(function (m) {
+            return String(m.id) === arg || m.name.toLowerCase() === String(arg).toLowerCase();
+        })[0];
+        if (!target) return 'Unknown map: ' + arg;
+        self.setMap(target.id);
+        return 'Switched to ' + target.name;
+    }, '<name|index>', 'switch the world generator');
 };
 
 Voxel4D.prototype.disable = function () {
@@ -132,11 +184,28 @@ Voxel4D.prototype.disable = function () {
     this.keys.down.removeListener('dimension axis switch', this.onDimensionAxisSwitch);
     this.keys.down.removeListener('dimension increment', this.onDimensionIncrement);
     this.keys.down.removeListener('dimension decrement', this.onDimensionDecrement);
+    this.keys.down.removeListener('switch map', this.onSwitchMap);
     this.game.shell.removeListener('gl-init', this.onGlInit);
     this.game.shell.removeListener('gl-render', this.onGlRender);
 };
 
 // API
+
+/**
+ * Switch the active world generator. Regenerates the whole visible world and
+ * announces the change (voxel-gps for the HUD, voxel-multiplayer to signal peers).
+ */
+Voxel4D.prototype.setMap = function (mapId) {
+    if (mapId === this.currentMapId) return;
+    this.currentMapId = mapId;
+    this.worker.postMessage({cmd: 'reconfigure', mapId: mapId});
+    this.reloadAllChunks();
+    this.emit('mapSwitch', mapId, MAPS[mapId].name);
+};
+
+Voxel4D.prototype.getMaps = function () {
+    return MAPS;
+};
 
 Voxel4D.prototype.workerMessage = function (event) {
     if (event.data.cmd === 'chunkGenerated') {
@@ -154,13 +223,22 @@ Voxel4D.prototype.setBlock = function (position, value) {
  * Bulk variant of setBlockXyzw for scene building, as one message rather than
  * one per block. Does not reload chunks: callers run before chunks generate.
  * @param {number[][]} blocks - array of [x, y, z, w, value]
+ * @param {number} [mapId] - target map (defaults to the worker's current map)
  */
-Voxel4D.prototype.setBlocksXyzw = function (blocks) {
-    this.worker.postMessage({cmd: 'setBlocksXyzw', blocks: blocks})
+Voxel4D.prototype.setBlocksXyzw = function (blocks, mapId) {
+    this.worker.postMessage({cmd: 'setBlocksXyzw', blocks: blocks, mapId: mapId})
 };
 
-Voxel4D.prototype.setBlockXyzwAndReloadChunk = function (position, value) {
-    this.worker.postMessage({cmd: 'setBlockXyzw', position: position, value: value})
+/**
+ * Apply a single 4D block edit and reload the affected chunk if it's in view.
+ * @param {number} [mapId] - target map; a remote edit for a different map still
+ *   updates that map's store but won't touch the current view.
+ */
+Voxel4D.prototype.setBlockXyzwAndReloadChunk = function (position, value, mapId) {
+    this.worker.postMessage({cmd: 'setBlockXyzw', position: position, value: value, mapId: mapId})
+    // An edit targeting a different map changed that map's store but nothing in
+    // the current view, so don't reload.
+    if (mapId !== undefined && mapId !== this.currentMapId) return
     const positionXyz = this.location.pUntransformer(position[0], position[1], position[2], position[3])
     // Check if this block is in our dimension
     if (positionXyz !== null) {

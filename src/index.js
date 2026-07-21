@@ -101,6 +101,7 @@ const start = function () {
                     'E': 'dimension axis switch',
                     'R': 'dimension increment',
                     'F': 'dimension decrement',
+                    'M': 'switch map',
 
                     // our extras
                     'F5': 'pov',
